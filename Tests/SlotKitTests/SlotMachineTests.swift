@@ -222,16 +222,17 @@ struct FinaleFramesTests {
     }
 
     @Test
-    func bustSequenceNeverShowsTheColorizerAndPulsesRed() throws {
-        // The bug: bust used to alternate normal(rainbow) ↔ red, so a loss still flashed
-        // rainbow. The whole sequence must stay off the colorizer — pure red ↔ plain. The
-        // bust red is `255;0;0`; the rainbow's non-red hues (e.g. `255;59;0` at offset 1)
-        // must never appear, which is what distinguishes a bust frame from a rainbow frame.
+    func bustSequencePulsesRedOnOrangeAndStaysOffTheColorizer() throws {
+        // Bust rests orange (#FF8800) and pulses red (#FF0000), bypassing the colorizer —
+        // so the rainbow's non-red hues (e.g. `255;59;0` at offset 1) never appear, which
+        // is what distinguishes a bust frame from a rainbow frame. It must start and END
+        // orange (the user asked for an orange-settled loss flash).
         let frames = SlotMachine.flashFrames(
             grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .bust,
         )
         #expect(frames.allSatisfy { !$0.contains("\u{1B}[1;38;2;255;59;0m") }) // no rainbow hue anywhere
-        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // beats are pure red
-        #expect(try #require(frames.last?.contains("\u{1B}[1;38;2;255;0;0m"))) // settles RED, not plain
+        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // some beats pulse red
+        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;136;0m") }) // some beats rest orange
+        #expect(try #require(frames.last?.contains("\u{1B}[1;38;2;255;136;0m"))) // settles ORANGE
     }
 }

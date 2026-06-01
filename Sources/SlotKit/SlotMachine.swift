@@ -131,25 +131,24 @@ public enum SlotMachine {
     enum GridStyle {
         /// The live look: run the theme's colorizer.
         case normal
-        /// Uncolored: the raw line, colorizer bypassed (the bust flash's base beat — a loss
-        /// shouldn't celebrate in rainbow between red pulses).
-        case plain
         /// The win flash "off" beat: faint, colorizer bypassed.
         case dim
-        /// The bust flash beat: bold pure-red (truecolor `#FF0000`), colorizer bypassed.
+        /// The bust flash pulse: bold pure-red (truecolor `#FF0000`), colorizer bypassed.
         case bust
+        /// The bust flash resting beat: bold orange (`#FF8800`), colorizer bypassed.
+        case orange
     }
 
     /// The two beats a flash alternates between: `base` is the resting state shown on even
     /// frames AND the final settle frame; `pulse` is the momentary off-beat on odd frames.
-    /// Win rests colored, blinks dim — `(.normal, .dim)`. Bust rests RED (so it starts and
-    /// ends red), blinks to plain — `(.bust, .plain)`.
+    /// Win rests colored, blinks dim — `(.normal, .dim)`. Bust rests ORANGE (so it starts
+    /// and ends orange), blinks to red — `(.orange, .bust)`.
     struct FlashStyle {
         let base: GridStyle
         let pulse: GridStyle
 
         static let win = FlashStyle(base: .normal, pulse: .dim)
-        static let bust = FlashStyle(base: .bust, pulse: .plain)
+        static let bust = FlashStyle(base: .orange, pulse: .bust)
     }
 
     private static func drawFrame(
@@ -181,9 +180,9 @@ public enum SlotMachine {
         for line in lines {
             let painted: String = switch style {
             case .normal: colorize(line, phase)
-            case .plain: line
             case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
             case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
+            case .orange: "\u{1B}[1;38;2;255;136;0m\(line)\u{1B}[0m"
             }
             out += "\r\(painted)\u{1B}[K\n"
         }
@@ -220,8 +219,8 @@ public enum SlotMachine {
     /// (odd), plus a final `base` settle frame so the grid never ends on a pulse. Every
     /// frame moves up by `lineCount` to overwrite the grid already on screen. The win flash
     /// uses base `.normal` / pulse `.dim` (colored grid blinks faint); the bust flash uses
-    /// base `.plain` / pulse `.bust` (uncolored grid pulses red — no rainbow on a loss).
-    /// Pure — no I/O.
+    /// base `.orange` / pulse `.bust` (the grid rests orange and pulses red — no rainbow on
+    /// a loss). Pure — no I/O.
     static func flashFrames(
         _ lines: [String],
         colorize: SlotColorizer,
