@@ -41,7 +41,9 @@ public struct SlotTheme: Sendable {
         }
     }
 
-    private init(
+    /// Memberwise initializer used by validated factories and the built-in theme.
+    /// External callers should go through ``SlotTheme/make(_:)`` so dimensions are checked.
+    init(
         cellWidth: Int,
         cellHeight: Int,
         spinning: [SlotSymbol],

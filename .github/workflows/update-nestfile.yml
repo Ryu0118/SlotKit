@@ -1,0 +1,78 @@
+name: Update Nestfile
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # daily at midnight UTC
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-nestfile:
+    name: Resolve Nestfile
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install nest and update nestfile
+        run: |
+          ./scripts/nest.sh bootstrap nestfile.yaml
+          ./scripts/nest.sh update-nestfile nestfile.yaml
+
+      - name: Upload resolved nestfile
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: resolved-nestfile
+          path: nestfile.yaml
+
+  create-pull-request:
+    name: Create Pull Request
+    needs: resolve-nestfile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: true
+
+      - name: Download resolved nestfile
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: resolved-nestfile
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet nestfile.yaml; then
+            echo "nestfile.yaml is already up to date"
+            exit 0
+          fi
+
+          branch="update-nestfile"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git switch -C "$branch"
+          git add nestfile.yaml
+          git commit -m "nestfile: update to latest versions"
+          git fetch origin "$branch:refs/remotes/origin/$branch" || true
+          git push --force-with-lease origin "$branch"
+
+          gh pr view "$branch" >/dev/null 2>&1 || gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "nestfile: update to latest versions" \
+            --body "Automated nestfile update via \`nest update-nestfile\`. Review the version bumps and merge if CI passes."

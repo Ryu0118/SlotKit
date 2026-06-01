@@ -1,0 +1,13 @@
+rules:
+- name: readme-api
+  sources:
+  - Sources/SlotKit/SlotMachine.swift
+  - Sources/SlotKit/SlotReel.swift
+  - Sources/SlotKit/SlotTheme.swift
+  - Sources/SlotKit/SlotTheme+Default.swift
+  - Sources/SlotKit/SlotSymbol.swift
+  - Sources/SlotKit/SlotColorizer.swift
+  doc: README.md
+  message: "Public API surface changed \u2014 update README (Quick start / Customization)
+    if types, methods, or theme fields changed."
+  checksum: 8948d8ca9f85808f2d6b5f17f32bcb5a98ca0b3f2596fe183a0b71ecdcb391c8

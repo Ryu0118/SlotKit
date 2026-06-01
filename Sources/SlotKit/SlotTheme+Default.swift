@@ -2,20 +2,20 @@ public extension SlotTheme {
     /// The built-in arcade theme: chunky 10×5 ASCII faces, a rainbow gradient, a 90 ms
     /// frame cadence, a 1 s minimum spin, and a flashing `JACKPOT` finale. Reproduces
     /// the original arcade look.
-    static let `default`: SlotTheme = // `make` only throws on malformed symbols; the built-in art is well-formed,
-        // so a failure here is a programming error worth crashing on.
-        // swiftlint:disable:next force_try
-        try! SlotTheme.make { theme in
-            theme.cellWidth = 10
-            theme.cellHeight = 5
-            theme.win = seven
-            theme.lose = cross
-            theme.spinning = [cherry, bell, bar, diamond, seven, grapes]
-            theme.colorize = SlotColorizers.rainbow
-            theme.frameInterval = 0.09
-            theme.minSpin = 1.0
-            theme.finale = SlotFinale(text: "  ★ ★ ★   J A C K P O T   ★ ★ ★  ")
-        }
+    ///
+    /// Built through the memberwise initializer (not ``make(_:)``) because the art is
+    /// known-valid at compile time, so it needs no runtime dimension check.
+    static let `default` = SlotTheme(
+        cellWidth: 10,
+        cellHeight: 5,
+        spinning: [cherry, bell, bar, diamond, seven, grapes],
+        win: seven,
+        lose: cross,
+        colorize: SlotColorizers.rainbow,
+        frameInterval: 0.09,
+        minSpin: 1.0,
+        finale: SlotFinale(text: "  ★ ★ ★   J A C K P O T   ★ ★ ★  "),
+    )
 
     /// The winning face: a chunky `7`.
     static let seven = SlotSymbol(rows: [

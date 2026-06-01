@@ -1,0 +1,20 @@
+name: gitleaks
+on: [pull_request, push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      # Resolve gitleaks from .mise.toml — same tool/version as the local pre-commit hook.
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+
+      # Scan the full history directly. Avoids gitleaks-action's push-range mode,
+      # which fails on the initial commit (no parent revision to diff against).
+      - name: Scan
+        run: mise exec -- gitleaks detect --source . --redact -v --exit-code 1

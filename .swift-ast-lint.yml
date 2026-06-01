@@ -1,0 +1,35 @@
+included_paths:
+  - "Sources/**/*.swift"
+  - "Tests/**/*.swift"
+excluded_paths:
+  - ".build/**"
+  - ".swiftpm/**"
+  - ".nest/**"
+
+rules:
+  # Control-flow nesting: keep runners/orchestration shallow.
+  deep-nesting:
+    args:
+      warning_depth: 3
+      error_depth: 5
+
+  # One large public/package type per file (module boundaries are strict here).
+  single-large-type-per-file:
+    args:
+      warning_lines: 50
+      error_lines: 100
+
+  # Prefer URL(filePath:) over the deprecated URL(fileURLWithPath:).
+  use-url-file-path: {}
+
+  # No file-scope func declarations — move helpers onto a type/extension/enum.
+  no-top-level-function: {}
+
+  # Public API must be documented (this is a library + CLI surface).
+  missing-docs:
+    args:
+      min_access_level: public
+
+  # Swift Testing hygiene.
+  meaningful-suite-description: {}
+  test-function-naming: {}
