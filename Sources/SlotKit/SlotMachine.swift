@@ -95,8 +95,16 @@ public enum SlotMachine {
 
         let outcomes = await results.outcomes(labels: labels)
         let result = SlotResult(outcomes: outcomes)
-        if result.allPassed, let finale = theme.finale, !Task.isCancelled {
-            await playFinale(finale, labels: labels, theme: theme)
+        if !Task.isCancelled {
+            if result.allPassed, let finale = theme.finale {
+                // Win: pulse the all-`win` grid bright ↔ dim.
+                let winGrid = labels.map { _ in theme.win }
+                await playFlash(finale, symbols: winGrid, offStyle: .dim, labels: labels, theme: theme)
+            } else if !result.allPassed, let bust = theme.bust {
+                // Bust: a restrained red sink on the actual final grid (won't outshine a win).
+                let grid = outcomes.map { $0.passed ? theme.win : theme.lose }
+                await playFlash(bust, symbols: grid, offStyle: .bust, labels: labels, theme: theme)
+            }
         }
         return result
     }
@@ -119,6 +127,16 @@ public enum SlotMachine {
         }
     }
 
+    /// How one grid frame paints its lines.
+    enum GridStyle {
+        /// The live look: run the theme's colorizer.
+        case normal
+        /// The win flash "off" beat: faint, colorizer bypassed.
+        case dim
+        /// The bust flash beat: faint red, colorizer bypassed.
+        case bust
+    }
+
     private static func drawFrame(
         _ symbols: [SlotSymbol],
         labels: [String],
@@ -127,55 +145,76 @@ public enum SlotMachine {
         moveUp: Int,
     ) async {
         let lines = SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme)
-        emit(gridFrame(lines, colorize: theme.colorize, phase: step * phaseStep, moveUp: moveUp, dim: false))
+        emit(gridFrame(lines, colorize: theme.colorize, phase: step * phaseStep, moveUp: moveUp, style: .normal))
     }
 
     /// Builds one grid frame string from already-rendered `lines`: an optional cursor-up by
-    /// `moveUp` lines, then each line cleared. When `dim` is false each line is colorized at
-    /// `phase`; when `dim` is true the line is emitted **without** the colorizer and wrapped
-    /// in faint SGR (`\u{1B}[2m`…`\u{1B}[22m`) — bypassing the colorizer is required because
-    /// the built-in colorizers emit bold (`\u{1B}[1m`), which would otherwise override the
-    /// faint and defeat the flash. Pure — no I/O.
+    /// `moveUp` lines, then each line cleared. `.normal` colorizes at `phase`; `.dim` and
+    /// `.bust` emit the line **without** the colorizer wrapped in faint / faint-red SGR.
+    /// Bypassing the colorizer is required because the built-in colorizers emit bold and
+    /// truecolor foregrounds (`\u{1B}[1;38;2;…m`), which would otherwise override the faint
+    /// or the red and defeat the flash. Pure — no I/O.
     static func gridFrame(
         _ lines: [String],
         colorize: SlotColorizer,
         phase: Int,
         moveUp: Int,
-        dim: Bool,
+        style: GridStyle,
     ) -> String {
         var out = ""
         if moveUp > 0 { out += "\u{1B}[\(moveUp)A" }
         for line in lines {
-            let painted = dim ? "\u{1B}[2m\(line)\u{1B}[22m" : colorize(line, phase)
+            let painted: String = switch style {
+            case .normal: colorize(line, phase)
+            case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
+            case .bust: "\u{1B}[2;31m\(line)\u{1B}[0m"
+            }
             out += "\r\(painted)\u{1B}[K\n"
         }
         return out
     }
 
-    /// Flashes the already-drawn winning grid in place, toggling bright ↔ dim, then settles
-    /// on a bright frame so the grid is left lit with the cursor below it.
-    private static func playFinale(
-        _ finale: SlotTheme.SlotFinale,
+    /// Flashes a grid that's already on screen in place — toggling between the live look
+    /// and `offStyle` — then settles on a normal (colorized) frame so no tint lingers under
+    /// whatever the caller prints next. Used for both the win flash (`offStyle: .dim`, all
+    /// `win` faces) and the bust flash (`offStyle: .bust`, the real mixed grid).
+    private static func playFlash(
+        _ flash: SlotTheme.SlotFinale,
+        symbols: [SlotSymbol],
+        offStyle: GridStyle,
         labels: [String],
         theme: SlotTheme,
     ) async {
-        let winGrid = labels.map { _ in theme.win }
-        let lines = SlotRenderer.frame(symbols: winGrid, labels: labels, theme: theme)
+        let lines = SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme)
         let lineCount = SlotRenderer.lineCount(for: theme)
-        let frames = finaleFrames(lines, colorize: theme.colorize, lineCount: lineCount, count: finale.frames)
+        let frames = flashFrames(
+            lines,
+            colorize: theme.colorize,
+            lineCount: lineCount,
+            count: flash.frames,
+            offStyle: offStyle,
+        )
         for (index, frame) in frames.enumerated() {
             emit(frame)
-            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(finale.interval)) }
+            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(flash.interval)) }
         }
     }
 
-    /// The full sequence of all-win flash frames: `count` blink frames (bright on even,
-    /// dim on odd) plus a final bright settle frame, so the grid never ends dimmed. Every
-    /// frame moves up by `lineCount` to overwrite the grid already on screen. Pure — no I/O.
-    static func finaleFrames(_ lines: [String], colorize: SlotColorizer, lineCount: Int, count: Int) -> [String] {
+    /// The full sequence of flash frames: `count` beats alternating normal ↔ `offStyle`
+    /// (normal on even, off on odd) plus a final normal settle frame, so the grid never
+    /// ends tinted. Every frame moves up by `lineCount` to overwrite the grid already on
+    /// screen. Pure — no I/O.
+    static func flashFrames(
+        _ lines: [String],
+        colorize: SlotColorizer,
+        lineCount: Int,
+        count: Int,
+        offStyle: GridStyle,
+    ) -> [String] {
         (0 ... count).map { frame in
-            let dim = frame < count && !frame.isMultiple(of: 2) // last frame settles bright
-            return gridFrame(lines, colorize: colorize, phase: frame * finalePhaseStep, moveUp: lineCount, dim: dim)
+            let off = frame < count && !frame.isMultiple(of: 2) // last frame settles normal
+            let style: GridStyle = off ? offStyle : .normal
+            return gridFrame(lines, colorize: colorize, phase: frame * finalePhaseStep, moveUp: lineCount, style: style)
         }
     }
 

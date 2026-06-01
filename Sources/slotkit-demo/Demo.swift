@@ -52,8 +52,10 @@ enum Demo {
             draft.win = moneySymbols.win
             draft.lose = moneySymbols.lose
             draft.spinning = moneySymbols.spinning
-            // All-win flash: blink the winning grid a few times to celebrate the jackpot.
+            // All-win flash celebrates the jackpot; the bust flash sinks the grid red on a
+            // loss — deliberately shorter and quieter than the win.
             draft.finale = SlotTheme.SlotFinale(frames: 10, interval: 0.1)
+            draft.bust = SlotTheme.SlotFinale(frames: 4, interval: 0.1)
         }
     }
 

@@ -21,20 +21,22 @@ public struct SlotTheme: Sendable {
     public let frameInterval: Double
     /// Minimum seconds a reel keeps spinning before it may lock.
     public let minSpin: Double
-    /// Optional flourish played when every reel wins (e.g. a jackpot banner).
+    /// Optional flourish played when every reel wins (the winning grid flashes).
     public let finale: SlotFinale?
+    /// Optional restrained flash played when at least one reel loses — a red sink on the
+    /// final grid, deliberately milder than `finale`. `nil` means the grid just settles.
+    public let bust: SlotFinale?
 
-    /// The all-win flourish: once every reel lands on `win`, the winning grid is flashed
-    /// in place for a moment — bright on, dim off — so a jackpot reads as a celebration
-    /// rather than just stopping. Configure how many times it blinks and how fast; a `nil`
-    /// finale on the theme means no flash (the grid just settles).
+    /// A grid flash: the on-screen grid is pulsed in place for `frames` beats — the win
+    /// `finale` toggles bright ↔ dim to celebrate a jackpot, the `bust` flash sinks the grid
+    /// red to mark a loss. A `nil` flash on the theme means no animation (the grid settles).
     public struct SlotFinale: Sendable {
-        /// Number of blink frames (each toggles the grid bright ↔ dim).
+        /// Number of flash beats (each toggles the grid between its live look and the off look).
         public let frames: Int
-        /// Seconds between blink frames.
+        /// Seconds between beats.
         public let interval: Double
 
-        /// Creates an all-win blink flourish.
+        /// Creates a grid-flash flourish.
         public init(frames: Int = 8, interval: Double = 0.12) {
             self.frames = frames
             self.interval = interval
@@ -53,6 +55,7 @@ public struct SlotTheme: Sendable {
         frameInterval: Double,
         minSpin: Double,
         finale: SlotFinale?,
+        bust: SlotFinale? = nil,
     ) {
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
@@ -63,6 +66,7 @@ public struct SlotTheme: Sendable {
         self.frameInterval = frameInterval
         self.minSpin = minSpin
         self.finale = finale
+        self.bust = bust
     }
 
     /// A draft theme passed to ``SlotTheme/make(_:)``; mutate its fields then build.
@@ -85,6 +89,8 @@ public struct SlotTheme: Sendable {
         public var minSpin = 1.0
         /// Optional all-win flourish.
         public var finale: SlotFinale?
+        /// Optional restrained loss flash (a red sink). `nil` = no loss animation.
+        public var bust: SlotFinale?
 
         /// An empty draft to fill in from scratch.
         init() {}
@@ -101,6 +107,7 @@ public struct SlotTheme: Sendable {
             frameInterval = theme.frameInterval
             minSpin = theme.minSpin
             finale = theme.finale
+            bust = theme.bust
         }
     }
 
@@ -146,6 +153,7 @@ public struct SlotTheme: Sendable {
             frameInterval: draft.frameInterval,
             minSpin: draft.minSpin,
             finale: draft.finale,
+            bust: draft.bust,
         )
     }
 
