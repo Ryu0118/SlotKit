@@ -15,9 +15,9 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 ║   ██     ║║   ██     ║║   ██     ║║   ██     ║
 ╚══════════╝╚══════════╝╚══════════╝╚══════════╝
    BUILD        TEST        LINT       DEPLOY   
-
-       ★ ★ ★   J A C K P O T   ★ ★ ★
 ```
+
+…all four `7`s line up and the whole grid flashes — jackpot.
 
 🌈 **A rainbow gradient scrolls** · ✨ **the winning grid flashes on a jackpot** ·
 🔥 **every reel spins in parallel**. Dopamine, delivered.
@@ -28,7 +28,7 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 
 - 🎡 **Spinning = visible progress.** Far more "alive" than a single spinner.
 - ⚡️ **Every check is genuinely parallel.** Heavy network validation keeps the reels turning while you wait.
-- 🎉 **All-pass fires a JACKPOT.** Make the success land.
+- 🎉 **All-pass flashes the winning grid.** Make the success land.
 - 🤖 **Pipes and CI stay quiet.** Zero decoration, byte-stable output — it never misbehaves in production.
 - 🪶 **Zero dependencies.** No logging or color library needed. SlotKit stands alone.
 
@@ -169,7 +169,7 @@ let snappy = try SlotTheme.default.with { draft in
 ## See it move first 👀
 
 ```bash
-swift run slotkit-demo            # 🎰 all win → JACKPOT
+swift run slotkit-demo            # 🎰 all win → the winning grid flashes
 swift run slotkit-demo --fail     # 💥 one reel loses → orange↔red bust flash, no jackpot
 swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + all-win flash
 swift run slotkit-demo --bare     # 🎰 unlabeled reels — no caption row, just the slot
