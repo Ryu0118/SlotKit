@@ -12,6 +12,13 @@ enum SlotRenderer {
         theme.cellHeight + 3 // top + art rows + bottom + label
     }
 
+    /// The spinning face an in-flight reel shows at animation `step`. Faces cycle through
+    /// `pool` by `step`; `index` offsets each reel so adjacent reels don't move in lockstep.
+    /// `pool` must be non-empty (guaranteed by ``SlotTheme/make(_:)``).
+    static func spinningFace(in pool: [SlotSymbol], step: Int, index: Int) -> SlotSymbol {
+        pool[(step + index * 3) % pool.count]
+    }
+
     /// Renders one full frame: a top border, `cellHeight` art rows, a bottom border,
     /// and a label row — each symbol boxed to `cellWidth`. Returns plain lines.
     static func frame(symbols: [SlotSymbol], labels: [String], theme: SlotTheme) -> [String] {

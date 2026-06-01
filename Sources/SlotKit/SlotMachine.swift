@@ -153,8 +153,7 @@ public enum SlotMachine {
             if let result = finished[index] {
                 return result ? theme.win : theme.lose
             }
-            let pool = theme.spinning
-            return pool[(step + index * 3) % pool.count]
+            return SlotRenderer.spinningFace(in: theme.spinning, step: step, index: index)
         }
     }
 }

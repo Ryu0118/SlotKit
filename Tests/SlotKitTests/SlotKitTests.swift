@@ -206,3 +206,191 @@ struct SlotMachineTests {
         }
     }
 }
+
+// MARK: - Shared fixtures
+
+/// Shared test fixtures.
+enum Fixtures {
+    /// A small, instantly-resolving theme for animated-path tests: `minSpin = 0` and a tiny
+    /// frame interval so `spin(_, plain: false)` returns without real-time delay, plus a
+    /// finale so the all-win path exercises the flourish branch.
+    static func fastTheme() throws -> SlotTheme {
+        try SlotTheme.make { draft in
+            draft.cellWidth = 3
+            draft.cellHeight = 1
+            draft.win = SlotSymbol(rows: ["WIN"])
+            draft.lose = SlotSymbol(rows: ["los"])
+            draft.spinning = [SlotSymbol(rows: ["..."]), SlotSymbol(rows: ["oOo"])]
+            draft.frameInterval = 0.001
+            draft.minSpin = 0
+            draft.colorize = SlotColorizers.plain
+            draft.finale = SlotTheme.SlotFinale(text: "WIN", frames: 1, interval: 0.001)
+        }
+    }
+}
+
+// MARK: - SlotResult
+
+struct SlotResultTests {
+    @Test(arguments: [
+        ([true, true, true], true),
+        ([true, false, true], false),
+        ([false, false], false),
+        ([], true), // vacuously true
+    ])
+    func allPassedReflectsEveryOutcome(outcomes: [Bool], expected: Bool) {
+        let result = SlotResult(outcomes: outcomes.enumerated().map { index, passed in
+            SlotOutcome(label: "\(index)", passed: passed)
+        })
+        #expect(result.allPassed == expected)
+    }
+}
+
+// MARK: - SlotMachine animated path (plain: false)
+
+struct SlotMachineAnimatedTests {
+    @Test
+    func animatedAllWinReportsEveryReelPassed() async throws {
+        let theme = try Fixtures.fastTheme()
+        let reels = [
+            SlotReel(label: "A") { true },
+            SlotReel(label: "B") { true },
+            SlotReel(label: "C") { true },
+        ]
+        let result = await SlotMachine.spin(reels, theme: theme, plain: false)
+        #expect(result.allPassed)
+        #expect(result.outcomes.map(\.label) == ["A", "B", "C"])
+    }
+
+    @Test
+    func animatedPartialFailReportsPerReelOutcomes() async throws {
+        let theme = try Fixtures.fastTheme()
+        let reels = [
+            SlotReel(label: "A") { true },
+            SlotReel(label: "B") { false },
+            SlotReel(label: "C") { true },
+        ]
+        let result = await SlotMachine.spin(reels, theme: theme, plain: false)
+        #expect(!result.allPassed)
+        #expect(result.outcomes == [
+            SlotOutcome(label: "A", passed: true),
+            SlotOutcome(label: "B", passed: false),
+            SlotOutcome(label: "C", passed: true),
+        ])
+    }
+
+    @Test
+    func animatedThrowingReelCountsAsFailure() async throws {
+        let theme = try Fixtures.fastTheme()
+        let reels = [
+            SlotReel(label: "OK") { true },
+            SlotReel(label: "ERR") { throw CancellationError() },
+        ]
+        let result = await SlotMachine.spin(reels, theme: theme, plain: false)
+        #expect(result.outcomes == [
+            SlotOutcome(label: "OK", passed: true),
+            SlotOutcome(label: "ERR", passed: false),
+        ])
+        #expect(!result.allPassed)
+    }
+
+    @Test
+    func animatedPathPreservesReelOrder() async throws {
+        // Reels resolve at staggered times; the result must stay in input order.
+        let theme = try Fixtures.fastTheme()
+        let reels = [
+            SlotReel(label: "SLOW") {
+                try? await Task.sleep(for: .milliseconds(30))
+                return true
+            },
+            SlotReel(label: "FAST") { true },
+        ]
+        let result = await SlotMachine.spin(reels, theme: theme, plain: false)
+        #expect(result.outcomes.map(\.label) == ["SLOW", "FAST"])
+    }
+}
+
+// MARK: - SlotRenderer.spinningFace
+
+struct SpinningFaceTests {
+    private let pool = [
+        SlotSymbol(rows: ["a"]),
+        SlotSymbol(rows: ["b"]),
+        SlotSymbol(rows: ["c"]),
+    ]
+
+    @Test(arguments: [
+        (0, 0, "a"), // step 0, reel 0
+        (1, 0, "b"), // step advances the face
+        (2, 0, "c"),
+        (3, 0, "a"), // wraps around the pool
+        (0, 1, "a"), // reel 1 offset by index*3 == 3, wraps back to a
+        (0, 2, "a"), // reel 2 offset by index*3 == 6, wraps back to a
+        (1, 1, "b"), // (1 + 3) % 3 == 1
+    ])
+    func spinningFaceCyclesByStepAndIndex(step: Int, index: Int, expected: String) {
+        let face = SlotRenderer.spinningFace(in: pool, step: step, index: index)
+        #expect(face.rows == [expected])
+    }
+
+    @Test
+    func adjacentReelsAreOffsetAtSameStep() {
+        // index*3 with a 3-element pool means reels 0/1/2 all land on the same face only
+        // because 3 % 3 == 0; a 2-element pool should stagger them.
+        let twoPool = [SlotSymbol(rows: ["x"]), SlotSymbol(rows: ["y"])]
+        let reel0 = SlotRenderer.spinningFace(in: twoPool, step: 0, index: 0)
+        let reel1 = SlotRenderer.spinningFace(in: twoPool, step: 0, index: 1)
+        #expect(reel0.rows == ["x"]) // (0 + 0) % 2
+        #expect(reel1.rows == ["y"]) // (0 + 3) % 2 == 1
+    }
+}
+
+// MARK: - SlotColorizer.gradient structure
+
+struct SlotGradientTests {
+    @Test
+    func hueWrapsEvery360Phases() {
+        // phase and phase+360 feed the same hue, so the colored output is identical.
+        #expect(SlotColorizers.gradient("hello", phase: 7) == SlotColorizers.gradient("hello", phase: 367))
+    }
+
+    @Test
+    func boldAndNonBoldDifferInWeightPrefix() {
+        let bold = SlotColorizers.gradient("x", phase: 0, bold: true)
+        let plain = SlotColorizers.gradient("x", phase: 0, bold: false)
+        #expect(bold.contains("[1;38;2;"))
+        #expect(plain.contains("[38;2;"))
+        #expect(!plain.contains("[1;38;2;"))
+    }
+
+    @Test
+    func emptyStringIsJustTheReset() {
+        #expect(SlotColorizers.gradient("", phase: 0) == "\u{1B}[0m")
+    }
+
+    @Test(arguments: [0, 60, 120, 180, 240, 300, 359])
+    func everyHueSectorProducesValidRGB(phase: Int) {
+        // Walk one character across each hue sector; output must stay well-formed
+        // (an escape per non-space char, terminated by the reset) for every sector.
+        let colored = SlotColorizers.gradient("X", phase: phase)
+        #expect(colored.contains("\u{1B}[1;38;2;"))
+        #expect(colored.contains("X"))
+        #expect(colored.hasSuffix("\u{1B}[0m"))
+    }
+}
+
+// MARK: - SlotRenderer.centered edge cases
+
+struct CenteredEdgeCaseTests {
+    @Test(arguments: [
+        ("x", 5, "  x  "), // odd padding, left-biased
+        ("xy", 5, " xy  "), // odd padding, extra space on the right
+        ("xy", 4, " xy "), // even padding
+        ("abc", 3, "abc"), // exact fit, untouched
+        ("toolong", 3, "too"), // clipped to width
+        ("", 3, "   "), // empty pads to all spaces
+    ])
+    func centeredPadsAndClips(text: String, width: Int, expected: String) {
+        #expect(SlotRenderer.centered(text, width: width) == expected)
+    }
+}
