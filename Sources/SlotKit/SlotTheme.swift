@@ -85,14 +85,51 @@ public struct SlotTheme: Sendable {
         public var minSpin = 1.0
         /// Optional all-win flourish.
         public var finale: SlotFinale?
+
+        /// An empty draft to fill in from scratch.
+        init() {}
+
+        /// Seeds a draft with an existing theme's fields, so a derived theme need only
+        /// override the few it wants to change. See ``SlotTheme/with(_:)``.
+        init(from theme: SlotTheme) {
+            cellWidth = theme.cellWidth
+            cellHeight = theme.cellHeight
+            spinning = theme.spinning
+            win = theme.win
+            lose = theme.lose
+            colorize = theme.colorize
+            frameInterval = theme.frameInterval
+            minSpin = theme.minSpin
+            finale = theme.finale
+        }
     }
 
-    /// Builds a validated theme. Every symbol (spinning, win, lose) must have exactly
-    /// `cellHeight` rows, each `cellWidth` characters wide; otherwise this throws
+    /// Builds a validated theme from scratch. Every symbol (spinning, win, lose) must have
+    /// exactly `cellHeight` rows, each `cellWidth` characters wide; otherwise this throws
     /// ``SlotThemeError`` rather than letting reels clip or misalign at render time.
     public static func make(_ configure: (inout Draft) -> Void) throws -> SlotTheme {
         var draft = Draft()
         configure(&draft)
+        return try build(from: draft)
+    }
+
+    /// Derives a new theme from this one, applying `configure` to a draft pre-filled with
+    /// this theme's fields — so you can tweak a few knobs of ``SlotTheme/default`` (or any
+    /// theme) without rebuilding it. The result is validated like ``SlotTheme/make(_:)``,
+    /// so a change that breaks the symbol dimensions (e.g. `cellWidth` without resizing the
+    /// art) throws ``SlotThemeError`` instead of misaligning silently.
+    ///
+    /// ```swift
+    /// let snappy = try SlotTheme.default.with { $0.minSpin = 0; $0.frameInterval = 0.02 }
+    /// ```
+    public func with(_ configure: (inout Draft) -> Void) throws -> SlotTheme {
+        var draft = Draft(from: self)
+        configure(&draft)
+        return try SlotTheme.build(from: draft)
+    }
+
+    /// The single validating build step shared by ``make(_:)`` and ``with(_:)``.
+    private static func build(from draft: Draft) throws -> SlotTheme {
         try validate(draft.win, label: "win", width: draft.cellWidth, height: draft.cellHeight)
         try validate(draft.lose, label: "lose", width: draft.cellWidth, height: draft.cellHeight)
         guard !draft.spinning.isEmpty else { throw SlotThemeError.noSpinningSymbols }

@@ -146,6 +146,18 @@ With nothing specified you get `SlotTheme.default` (the 10×5 arcade faces, rain
 gradient, 90 ms cadence, 1 s spin, and the flashing `JACKPOT`) — exactly what you
 saw above.
 
+Want the arcade look but a tweak or two? Derive from any theme with `with` —
+it inherits every field you don't touch and re-validates the result, so a change
+that breaks the symbol dimensions throws `SlotThemeError` instead of misaligning.
+
+```swift
+// Same default look, just faster.
+let snappy = try SlotTheme.default.with { draft in
+    draft.minSpin       = 0
+    draft.frameInterval = 0.02
+}
+```
+
 ---
 
 ## See it move first 👀

@@ -53,4 +53,30 @@ struct SlotThemeValidationTests {
             }
         }
     }
+
+    @Test
+    func withDerivesFromBaseKeepingUntouchedFields() throws {
+        // A small tweak inherits everything else from `.default` and stays valid.
+        let derived = try SlotTheme.default.with { draft in
+            draft.minSpin = 0
+            draft.frameInterval = 0.02
+        }
+        #expect(derived.minSpin == 0)
+        #expect(derived.frameInterval == 0.02)
+        // Untouched fields carry over from the base.
+        #expect(derived.cellWidth == SlotTheme.default.cellWidth)
+        #expect(derived.cellHeight == SlotTheme.default.cellHeight)
+        #expect(derived.spinning.count == SlotTheme.default.spinning.count)
+    }
+
+    @Test
+    func withRevalidatesAndThrowsOnBrokenDimensions() {
+        // Changing cellWidth without resizing the inherited 10-wide symbols must throw —
+        // proves `with` re-validates the derived result instead of trusting the base.
+        #expect(throws: SlotThemeError.self) {
+            try SlotTheme.default.with { draft in
+                draft.cellWidth = 7
+            }
+        }
+    }
 }
