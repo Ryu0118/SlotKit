@@ -15,7 +15,7 @@ public extension SlotTheme {
         frameInterval: 0.09,
         minSpin: 1.0,
         finale: SlotFinale(frames: 8, interval: 0.12),
-        bust: SlotFinale(frames: 4, interval: 0.1),
+        bust: SlotFinale(frames: 6, interval: 0.3),
     )
 
     /// The winning face: a chunky `7`.

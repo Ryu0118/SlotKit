@@ -55,7 +55,7 @@ enum Demo {
             // All-win flash celebrates the jackpot; the bust flash sinks the grid red on a
             // loss — deliberately shorter and quieter than the win.
             draft.finale = SlotTheme.SlotFinale(frames: 10, interval: 0.1)
-            draft.bust = SlotTheme.SlotFinale(frames: 4, interval: 0.1)
+            draft.bust = SlotTheme.SlotFinale(frames: 6, interval: 0.3)
         }
     }
 
