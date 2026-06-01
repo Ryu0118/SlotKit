@@ -108,4 +108,4 @@ swift run slotkit-demo | cat      # plain, piped output
 
 ## License
 
-MIT
+SlotKit is released under the MIT License. See [LICENSE](LICENSE) for details.
