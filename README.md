@@ -19,7 +19,7 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
        ★ ★ ★   J A C K P O T   ★ ★ ★
 ```
 
-🌈 **A rainbow gradient scrolls** · ✨ **`JACKPOT` flashes** ·
+🌈 **A rainbow gradient scrolls** · ✨ **the winning grid flashes on a jackpot** ·
 🔥 **every reel spins in parallel**. Dopamine, delivered.
 
 ---
@@ -118,7 +118,7 @@ let theme = try SlotTheme.make { draft in
     draft.colorize      = SlotColorizers.rainbow   // .rainbow / .plain / your own
     draft.frameInterval = 0.09                     // seconds per frame (speed)
     draft.minSpin       = 1.0                      // minimum spin time (avoid finishing too fast)
-    draft.finale        = SlotTheme.SlotFinale(text: " ✦ ALL GREEN ✦ ")  // all-win flourish
+    draft.finale        = SlotTheme.SlotFinale(frames: 8, interval: 0.12)  // all-win grid flash
 }
 
 await SlotMachine.spin(theme: theme) {
@@ -137,13 +137,13 @@ The knobs:
 | `colorize` | Coloring `(line, phase) -> String`. `.rainbow` / `.plain` / your own |
 | `frameInterval` | Spin speed (interval between frames) |
 | `minSpin` | Minimum spin time (so a reel doesn't finish in a dull instant) |
-| `finale` | The all-win flourish (text, flash count, interval) |
+| `finale` | The all-win flash: blink the winning grid (flash count, interval); `nil` = no flash |
 
 > A custom `colorize` receives one laid-out line plus the animation phase.
 > **Don't change the display width** — doing so misaligns the reel grid. Color only.
 
 With nothing specified you get `SlotTheme.default` (the 10×5 arcade faces, rainbow
-gradient, 90 ms cadence, 1 s spin, and the flashing `JACKPOT`) — exactly what you
+gradient, 90 ms cadence, 1 s spin, and the all-win grid flash) — exactly what you
 saw above.
 
 Want the arcade look but a tweak or two? Derive from any theme with `with` —
@@ -165,7 +165,7 @@ let snappy = try SlotTheme.default.with { draft in
 ```bash
 swift run slotkit-demo            # 🎰 all win → JACKPOT
 swift run slotkit-demo --fail     # 💥 one reel loses → no jackpot
-swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + MEGA JACKPOT
+swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + all-win flash
 swift run slotkit-demo | cat      # 🤐 piped = plain result only
 ```
 
