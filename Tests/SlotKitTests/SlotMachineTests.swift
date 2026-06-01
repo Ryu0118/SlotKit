@@ -231,7 +231,7 @@ struct FinaleFramesTests {
             grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .bust,
         )
         #expect(frames.allSatisfy { !$0.contains("\u{1B}[1;38;2;255;59;0m") }) // no rainbow hue anywhere
-        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // some frames pulse pure red
-        #expect(try !#require(frames.last?.contains("\u{1B}[1;38;2;255;0;0m"))) // settles plain, not red
+        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // beats are pure red
+        #expect(try #require(frames.last?.contains("\u{1B}[1;38;2;255;0;0m"))) // settles RED, not plain
     }
 }

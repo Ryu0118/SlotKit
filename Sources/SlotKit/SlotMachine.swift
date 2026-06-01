@@ -140,14 +140,16 @@ public enum SlotMachine {
         case bust
     }
 
-    /// The two beats a flash alternates between: `base` on even frames (and the settle
-    /// frame), `pulse` on odd frames. Win = (`.normal`, `.dim`); bust = (`.plain`, `.bust`).
+    /// The two beats a flash alternates between: `base` is the resting state shown on even
+    /// frames AND the final settle frame; `pulse` is the momentary off-beat on odd frames.
+    /// Win rests colored, blinks dim — `(.normal, .dim)`. Bust rests RED (so it starts and
+    /// ends red), blinks to plain — `(.bust, .plain)`.
     struct FlashStyle {
         let base: GridStyle
         let pulse: GridStyle
 
         static let win = FlashStyle(base: .normal, pulse: .dim)
-        static let bust = FlashStyle(base: .plain, pulse: .bust)
+        static let bust = FlashStyle(base: .bust, pulse: .plain)
     }
 
     private static func drawFrame(
