@@ -1,16 +1,43 @@
-# SlotKit
+# 🎰 SlotKit
 
-An ASCII-art **slot machine** for the terminal that dramatizes a set of parallel
-async checks. Each check is a spinning reel; when it resolves, the reel locks on a
-win or lose face. When every reel wins, an optional jackpot flourish fires.
+> **退屈な `Checking… ✓` にサヨナラ。** あなたの CLI のチェックを、
+> パチンコ屋のフィーバーみたいに **ガチャガチャ回る ASCII スロット**に変える Swift ライブラリ。
 
-Built for CLIs. Fully self-contained — no logging framework, no color library.
-Animation is shown only on an interactive TTY; piped/CI/`NO_COLOR` output falls back
-to plain, deterministic results.
+チェック1個 = リール1本。処理が走ってる間リールは **ぐるんぐるん回り**、終わった瞬間に
+`7`（成功）か `X`（失敗）で **ガチン！と止まる**。ぜんぶ `7` で揃ったら…
 
-## Install
+```
+╔══════════╗╔══════════╗╔══════════╗╔══════════╗
+║ ███████  ║║ ███████  ║║ ███████  ║║ ███████  ║
+║ ▀▀▀▀██   ║║ ▀▀▀▀██   ║║ ▀▀▀▀██   ║║ ▀▀▀▀██   ║
+║    ██    ║║    ██    ║║    ██    ║║    ██    ║
+║   ██     ║║   ██     ║║   ██     ║║   ██     ║
+║   ██     ║║   ██     ║║   ██     ║║   ██     ║
+╚══════════╝╚══════════╝╚══════════╝╚══════════╝
+   YAML        PROP        AUTH        DRIFT
+
+       ★ ★ ★   J A C K P O T   ★ ★ ★
+```
+
+🌈 **虹色グラデーションが流れる** ／ ✨ **`JACKPOT` がチカチカ点滅** ／
+🔥 **全リール並列でぶん回る**。脳汁、出ます。
+
+---
+
+## なんで気持ちええのか
+
+- 🎡 **回ってる = 進捗が見える。** スピナー1個より圧倒的に「動いてる感」。
+- ⚡️ **全チェックが本当に並列。** 重いネットワーク検証も、待ってる間ずっとリールが回る。
+- 🎉 **全部通ると JACKPOT 演出。** 成功体験を爆発させる。やめられん。
+- 🤖 **でもパイプ／CI ではちゃんと地味になる。** 装飾ゼロ・byte 安定。本番で暴れない。
+- 🪶 **依存ゼロ。** ログライブラリも色ライブラリも要らん。SlotKit 単体で動く。
+
+---
+
+## 入れる
 
 ```swift
+// Package.swift
 .package(url: "https://github.com/Ryu0118/SlotKit", from: "0.1.0"),
 ```
 
@@ -18,93 +45,106 @@ to plain, deterministic results.
 .target(name: "YourApp", dependencies: ["SlotKit"]),
 ```
 
-## Quick start
+---
+
+## 30秒で回す
 
 ```swift
 import SlotKit
 
+// チェック = リール。各クロージャが裏で並列に走る。
 let reels = [
-    SlotReel(label: "YAML")  { validateYAML() },
-    SlotReel(label: "AUTH")  { try await checkAuth() },     // network check
+    SlotReel(label: "YAML")  { validateYAML() },          // 同期チェック
+    SlotReel(label: "AUTH")  { try await checkAuth() },   // ネットワーク
     SlotReel(label: "DRIFT") { try await checkDrift() },
 ]
 
-let result = await SlotMachine.spin(reels)   // spins all reels concurrently
+// 🎰 回す！ ぜんぶ並列で走って、終わった順にガチンと止まる。
+let result = await SlotMachine.spin(reels)
 
 for outcome in result.outcomes {
-    print("\(outcome.label): \(outcome.passed ? "ok" : "failed")")
+    print("\(outcome.label): \(outcome.passed ? "✅" : "❌")")
 }
-if result.allPassed { print("All checks passed.") }
+if result.allPassed { print("🎉 全部通った！") }
 ```
 
-Each reel's `work` runs **immediately and in parallel**; its reel keeps spinning until
-the closure returns. `true` locks the reel on the win face, `false` or a thrown error
-on the lose face. `spin` returns a `SlotResult` — inspect `outcomes` and `allPassed`.
+`work` が `true` を返したら **`7` で当たり**、`false` か throw したら **`X` で外れ**。
+`spin` は `SlotResult` を返すから、`outcomes`（各リールの結果）と `allPassed`（全勝か）を見るだけ。
 
-## Plain / silent output
+---
 
-`spin` auto-detects the terminal. Force it with the `plain` argument — this is the
-bridge to a host `--silent` flag:
+## 静かにしたい時（`--silent` と繋ぐ）
+
+`spin` は端末を**自動判定**する。ターミナルなら回る、パイプ／CI／`NO_COLOR` なら地味に結果だけ。
+明示的に強制もできる ── ホストの `--silent` フラグと繋ぐのはコレ👇
 
 ```swift
-await SlotMachine.spin(reels, plain: isSilent)   // true → no animation, just results
-await SlotMachine.spin(reels, plain: nil)        // nil (default) → auto-detect TTY
+await SlotMachine.spin(reels, plain: isSilent)  // true → 演出なし、結果だけ
+await SlotMachine.spin(reels, plain: nil)       // nil（既定）→ 端末を自動判定
 ```
 
-When plain, nothing is drawn: the checks still run and results are returned, so the
-caller prints its own lines and output stays byte-stable.
+`plain` の時は**一切描画しない**。チェックは走るし結果も返るから、呼び出し側が自分で
+プレーンな行を出せばOK。出力は byte 単位で安定 = テストもCIも安心。
 
-## Customization
+---
 
-Everything visual lives in a `SlotTheme`, built through a validated factory. Symbol
-dimensions are checked up front — every symbol must be exactly `cellWidth × cellHeight`,
-or `make` throws `SlotThemeError` instead of clipping silently.
+## 自分好みにカスタムする 🎨
+
+見た目とタイミングは全部 `SlotTheme` に入ってる。`make` で組むと
+**シンボルの寸法を最初にチェック**してくれる ── どれか1個でも `cellWidth × cellHeight`
+からズレてたら、黙ってクリップせず `SlotThemeError` を投げる。事故らない。
 
 ```swift
 let theme = try SlotTheme.make { draft in
-    draft.cellWidth = 7
+    draft.cellWidth  = 7
     draft.cellHeight = 3
-    draft.win  = SlotSymbol(rows: ["  ╱    ", " ╱     ", "╲╱     "])
-    draft.lose = SlotSymbol(rows: ["       ", "═══════", "       "])
-    draft.spinning = [
+    draft.win  = SlotSymbol(rows: ["  ╱    ", " ╱     ", "╲╱     "])  // 当たりの顔
+    draft.lose = SlotSymbol(rows: ["       ", "═══════", "       "])  // 外れの顔
+    draft.spinning = [                                                // 回転中の顔たち
         SlotSymbol(rows: ["  ▄▄▄  ", " █████ ", "  ▀▀▀  "]),
         SlotSymbol(rows: ["  ◇◇◇  ", " ◇◇◇◇◇ ", "  ◇◇◇  "]),
     ]
-    draft.colorize = SlotColorizers.rainbow          // or .plain, or your own
-    draft.frameInterval = 0.09                        // seconds per frame
-    draft.minSpin = 1.0                               // min spin before a reel locks
-    draft.finale = SlotTheme.SlotFinale(text: " ✦ ALL GREEN ✦ ")
+    draft.colorize      = SlotColorizers.rainbow   // .rainbow / .plain / 自作
+    draft.frameInterval = 0.09                     // 1フレームの秒数（速さ）
+    draft.minSpin       = 1.0                      // 最低何秒は回すか（早すぎ防止）
+    draft.finale        = SlotTheme.SlotFinale(text: " ✦ ALL GREEN ✦ ")  // 全勝演出
 }
 
 await SlotMachine.spin(reels, theme: theme)
 ```
 
-Customization axes:
+いじれるツマミ:
 
-| Field           | What it controls                                            |
-|-----------------|-------------------------------------------------------------|
-| `cellWidth/Height` | reel window geometry (all symbols must match)            |
-| `spinning`      | faces cycled while a reel spins                              |
-| `win` / `lose`  | faces a reel locks on                                       |
-| `colorize`      | `(line, phase) -> String`; `.rainbow`, `.plain`, or custom  |
-| `frameInterval` | animation cadence                                           |
-| `minSpin`       | minimum spin time before a reel may lock                    |
-| `finale`        | optional all-win flourish (text, frames, interval)          |
+| ツマミ | 何が変わる |
+|--------|------------|
+| `cellWidth` / `cellHeight` | リール窓の大きさ（全シンボル同じ寸法に揃える） |
+| `spinning` | 回転中にパラパラ切り替わる顔たち |
+| `win` / `lose` | 止まった時の当たり／外れの顔 |
+| `colorize` | 色付け `(line, phase) -> String`。`.rainbow`／`.plain`／自作 |
+| `frameInterval` | 回転の速さ（フレーム間隔） |
+| `minSpin` | 最低スピン時間（一瞬で終わってつまらん、を防ぐ） |
+| `finale` | 全勝した時のフィーバー演出（文字・点滅回数・間隔） |
 
-A custom `colorize` receives each laid-out line plus the animation phase and must
-preserve the line's display width so the reel grid stays aligned.
+> 自作 `colorize` は「組み上がった1行 + アニメの phase」を受け取る。
+> **表示幅は変えるな** ── 変えるとリールの格子がズレる。色だけ盛れ。
 
-`SlotTheme.default` is the built-in 10×5 arcade theme (rainbow gradient, 90 ms frames,
-1 s spin, flashing `JACKPOT`).
+何も指定しなければ `SlotTheme.default`（10×5 のアーケード顔・虹グラデ・90ms・1秒スピン・
+点滅 `JACKPOT`）が使われる。今あなたが上で見たアレ。
 
-## Demo
+---
+
+## まず動かして見てみ 👀
 
 ```bash
-swift run slotkit-demo            # animated, all win → jackpot
-swift run slotkit-demo --fail     # one reel loses, no jackpot
-swift run slotkit-demo --custom   # a custom 7×3 theme
-swift run slotkit-demo | cat      # plain, piped output
+swift run slotkit-demo            # 🎰 全部当たり → JACKPOT
+swift run slotkit-demo --fail     # 💥 1個外れる → ジャックポットなし
+swift run slotkit-demo --custom   # 🎨 自作 7×3 テーマ
+swift run slotkit-demo | cat      # 🤐 パイプ = 地味な結果だけ
 ```
+
+百聞は一見にしかず。ターミナルで `swift run slotkit-demo` 打って、回るとこ見てくれ。
+
+---
 
 ## License
 
