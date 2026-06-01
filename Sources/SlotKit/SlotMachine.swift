@@ -109,8 +109,8 @@ public enum SlotMachine {
         return result
     }
 
-    private static func drawLoop(_ results: ResultBox, labels: [String], theme: SlotTheme) async {
-        let lineCount = SlotRenderer.lineCount(for: theme)
+    private static func drawLoop(_ results: ResultBox, labels: [String?], theme: SlotTheme) async {
+        let lineCount = SlotRenderer.lineCount(for: theme, hasLabels: SlotRenderer.hasLabels(labels))
         var step = 0
         var moveUp = 0
         while true {
@@ -153,7 +153,7 @@ public enum SlotMachine {
 
     private static func drawFrame(
         _ symbols: [SlotSymbol],
-        labels: [String],
+        labels: [String?],
         theme: SlotTheme,
         step: Int,
         moveUp: Int,
@@ -197,11 +197,11 @@ public enum SlotMachine {
         _ flash: SlotTheme.SlotFinale,
         symbols: [SlotSymbol],
         style: FlashStyle,
-        labels: [String],
+        labels: [String?],
         theme: SlotTheme,
     ) async {
         let lines = SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme)
-        let lineCount = SlotRenderer.lineCount(for: theme)
+        let lineCount = SlotRenderer.lineCount(for: theme, hasLabels: SlotRenderer.hasLabels(labels))
         let frames = flashFrames(
             lines,
             colorize: theme.colorize,
@@ -251,7 +251,7 @@ public enum SlotMachine {
             finished[index] = passed
         }
 
-        func outcomes(labels: [String]) -> [SlotOutcome] {
+        func outcomes(labels: [String?]) -> [SlotOutcome] {
             labels.enumerated().map { index, label in
                 SlotOutcome(label: label, passed: finished[index] == true)
             }

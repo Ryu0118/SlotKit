@@ -36,6 +36,15 @@ struct SlotMachineTests {
     }
 
     @Test
+    func unlabeledReelCarriesNilLabelThroughToOutcome() async {
+        // The `SlotReel(_:)` convenience init leaves the label nil, and that propagates to
+        // the outcome — a spin-only (no caption) reel.
+        let result = await SlotMachine.spin([SlotReel { true }], plain: true)
+        #expect(result.outcomes.map(\.label) == [nil])
+        #expect(result.allPassed)
+    }
+
+    @Test
     func cancellationPropagatesToReelsOnAnimatedPath() async {
         // Regression for the busy-spin / leaked-task bug: the animated path (`plain: false`)
         // must propagate cancellation into the reel checks and return promptly, not spin.

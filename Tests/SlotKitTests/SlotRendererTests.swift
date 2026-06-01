@@ -48,16 +48,22 @@ struct SlotRendererTests {
     }
 
     @Test
-    func lineCountMatchesFrameOutput() throws {
+    func lineCountMatchesFrameOutputWithLabels() throws {
         // SSoT guard: the count the animation loop uses to reposition the cursor must
         // equal the lines `frame` actually emits, so layout edits can't silently desync.
         let theme = try makeTheme()
-        let lines = SlotRenderer.frame(
-            symbols: [SlotSymbol(rows: ["WWW"])],
-            labels: ["A"],
-            theme: theme,
-        )
-        #expect(lines.count == SlotRenderer.lineCount(for: theme))
+        let lines = SlotRenderer.frame(symbols: [SlotSymbol(rows: ["WWW"])], labels: ["A"], theme: theme)
+        #expect(lines.count == SlotRenderer.lineCount(for: theme, hasLabels: true))
+    }
+
+    @Test
+    func lineCountMatchesFrameOutputWhenUnlabeled() throws {
+        // The label row is dropped when every reel is unlabeled — `frame` and `lineCount`
+        // must agree on that, or the animated cursor scrolls into the grid above.
+        let theme = try makeTheme()
+        let lines = SlotRenderer.frame(symbols: [SlotSymbol(rows: ["WWW"])], labels: [nil], theme: theme)
+        #expect(lines.count == SlotRenderer.lineCount(for: theme, hasLabels: false))
+        #expect(lines.count == SlotRenderer.lineCount(for: theme, hasLabels: true) - 1) // one row shorter
     }
 }
 

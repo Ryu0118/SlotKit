@@ -1,24 +1,32 @@
-/// One check shown as a single reel: a label and the async work that resolves it.
+/// One check shown as a single reel: an optional label and the async work that resolves it.
 ///
 /// The reel spins until `work` returns; `true` locks it on the theme's win face,
-/// `false` (or a thrown error) on the lose face.
+/// `false` (or a thrown error) on the lose face. A `nil` label means no caption — when
+/// every reel is unlabeled the renderer drops the label row entirely (a plain slot, no
+/// check names), useful for a spin-for-its-own-sake CLI rather than a check runner.
 public struct SlotReel: Sendable {
-    /// The text shown beneath the reel.
-    public let label: String
+    /// The text shown beneath the reel, or `nil` for no caption.
+    public let label: String?
     /// The asynchronous check; its `Bool` result decides win/lose.
     public let work: @Sendable () async throws -> Bool
 
-    /// Creates a reel from a label and its async check.
+    /// Creates a reel with a caption and its async check.
     public init(label: String, work: @escaping @Sendable () async throws -> Bool) {
         self.label = label
+        self.work = work
+    }
+
+    /// Creates an unlabeled reel — just a spinning reel and its async check.
+    public init(_ work: @escaping @Sendable () async throws -> Bool) {
+        label = nil
         self.work = work
     }
 }
 
 /// The resolved outcome of one reel after the spin completes.
 public struct SlotOutcome: Sendable, Equatable {
-    /// The reel's label.
-    public let label: String
+    /// The reel's label, or `nil` if the reel was unlabeled.
+    public let label: String?
     /// Whether the reel's check passed.
     public let passed: Bool
 }

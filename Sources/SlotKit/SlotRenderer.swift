@@ -4,12 +4,19 @@
 /// reel grid as plain lines (no ANSI, no I/O). This is the library's testable core;
 /// animation and color are layered on top by ``SlotMachine``.
 enum SlotRenderer {
-    /// The number of lines ``frame(symbols:labels:theme:)`` produces for `theme`: a top
-    /// border, `cellHeight` art rows, a bottom border, and a label row. This is the single
-    /// source of truth the animation loop uses to reposition the cursor between frames —
-    /// keep it in lockstep with `frame`'s layout below.
-    static func lineCount(for theme: SlotTheme) -> Int {
-        theme.cellHeight + 3 // top + art rows + bottom + label
+    /// Whether a set of labels warrants a label row: true if any reel is labeled. When all
+    /// reels are unlabeled the row is dropped. `frame` and `lineCount` MUST branch on this
+    /// same predicate or the animation cursor desyncs from what's drawn.
+    static func hasLabels(_ labels: [String?]) -> Bool {
+        labels.contains { $0 != nil }
+    }
+
+    /// The number of lines ``frame(symbols:labels:theme:)`` produces: a top border,
+    /// `cellHeight` art rows, a bottom border, and — only when `hasLabels` — a label row.
+    /// This is the single source of truth the animation loop uses to reposition the cursor
+    /// between frames; keep it in lockstep with `frame`'s layout below.
+    static func lineCount(for theme: SlotTheme, hasLabels: Bool) -> Int {
+        theme.cellHeight + (hasLabels ? 3 : 2) // top + art rows + bottom (+ label)
     }
 
     /// The spinning face an in-flight reel shows at animation `step`. Faces cycle through
@@ -19,9 +26,11 @@ enum SlotRenderer {
         pool[(step + index * 3) % pool.count]
     }
 
-    /// Renders one full frame: a top border, `cellHeight` art rows, a bottom border,
-    /// and a label row — each symbol boxed to `cellWidth`. Returns plain lines.
-    static func frame(symbols: [SlotSymbol], labels: [String], theme: SlotTheme) -> [String] {
+    /// Renders one full frame: a top border, `cellHeight` art rows, a bottom border, and —
+    /// only when any reel is labeled — a label row (nil cells render as blanks so a mix of
+    /// labeled and unlabeled reels still aligns). Each symbol boxed to `cellWidth`. Returns
+    /// plain lines.
+    static func frame(symbols: [SlotSymbol], labels: [String?], theme: SlotTheme) -> [String] {
         let width = theme.cellWidth
         // Borders are identical per cell, so build one segment and repeat it.
         let top = String(repeating: "╔" + String(repeating: "═", count: width) + "╗", count: symbols.count)
@@ -31,7 +40,8 @@ enum SlotRenderer {
             let line = symbols.map { "║" + centered($0.rows[row], width: width) + "║" }.joined()
             artLines.append(line)
         }
-        let labelLine = labels.map { centered($0, width: width + 2) }.joined()
+        guard hasLabels(labels) else { return [top] + artLines + [bottom] }
+        let labelLine = labels.map { centered($0 ?? "", width: width + 2) }.joined()
         return [top] + artLines + [bottom, labelLine]
     }
 

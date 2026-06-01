@@ -14,28 +14,32 @@ enum Demo {
         let arguments = Set(CommandLine.arguments.dropFirst())
         let forceFail = arguments.contains("--fail")
         let custom = arguments.contains("--custom")
+        let bare = arguments.contains("--bare")
 
         let theme: SlotTheme = try custom ? customTheme() : .default
 
-        // Declared as a builder block to showcase @SlotReelsBuilder.
+        // Declared as a builder block to showcase @SlotReelsBuilder. With --bare the reels
+        // carry no labels, so the renderer drops the caption row — just a spinning slot.
         let result = await SlotMachine.spin(theme: theme) {
-            delayedCheck("BUILD", passes: true, milliseconds: 400)
-            delayedCheck("TEST", passes: true, milliseconds: 900)
-            delayedCheck("LINT", passes: !forceFail, milliseconds: 1500)
-            delayedCheck("DEPLOY", passes: true, milliseconds: 2100)
+            delayedCheck(bare ? nil : "BUILD", passes: true, milliseconds: 400)
+            delayedCheck(bare ? nil : "TEST", passes: true, milliseconds: 900)
+            delayedCheck(bare ? nil : "LINT", passes: !forceFail, milliseconds: 1500)
+            delayedCheck(bare ? nil : "DEPLOY", passes: true, milliseconds: 2100)
         }
 
         for outcome in result.outcomes {
-            emitLine("\(outcome.label): \(outcome.passed ? "pass" : "fail")")
+            let name = outcome.label ?? "reel"
+            emitLine("\(name): \(outcome.passed ? "pass" : "fail")")
         }
         emitLine(result.allPassed ? "All reels passed." : "Some reels failed.")
     }
 
-    private static func delayedCheck(_ label: String, passes: Bool, milliseconds: Int) -> SlotReel {
-        SlotReel(label: label) {
+    private static func delayedCheck(_ label: String?, passes: Bool, milliseconds: Int) -> SlotReel {
+        let work: @Sendable () async throws -> Bool = {
             try? await Task.sleep(for: .milliseconds(milliseconds))
             return passes
         }
+        return label.map { SlotReel(label: $0, work: work) } ?? SlotReel(work)
     }
 
     /// A loud money-slot theme. Every symbol row is exactly 9 single-width columns
