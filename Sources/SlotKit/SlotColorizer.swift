@@ -24,6 +24,7 @@ public enum SlotColorizers {
     static func gradient(_ text: String, phase: Int, bold: Bool = true) -> String {
         let weight = bold ? "1;" : ""
         var out = ""
+        out.reserveCapacity(text.count * 25) // ~one truecolor escape + char per non-space
         for (offset, character) in text.enumerated() {
             if character == " " {
                 out.append(character)
