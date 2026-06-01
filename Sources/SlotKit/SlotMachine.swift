@@ -97,13 +97,13 @@ public enum SlotMachine {
         let result = SlotResult(outcomes: outcomes)
         if !Task.isCancelled {
             if result.allPassed, let finale = theme.finale {
-                // Win: pulse the all-`win` grid bright ↔ dim.
+                // Win: pulse the all-`win` grid bright ↔ dim (keeps its color).
                 let winGrid = labels.map { _ in theme.win }
-                await playFlash(finale, symbols: winGrid, offStyle: .dim, labels: labels, theme: theme)
+                await playFlash(finale, symbols: winGrid, style: .win, labels: labels, theme: theme)
             } else if !result.allPassed, let bust = theme.bust {
-                // Bust: a restrained red sink on the actual final grid (won't outshine a win).
+                // Bust: pulse the final grid red ↔ plain — no rainbow on a loss.
                 let grid = outcomes.map { $0.passed ? theme.win : theme.lose }
-                await playFlash(bust, symbols: grid, offStyle: .bust, labels: labels, theme: theme)
+                await playFlash(bust, symbols: grid, style: .bust, labels: labels, theme: theme)
             }
         }
         return result
@@ -131,10 +131,23 @@ public enum SlotMachine {
     enum GridStyle {
         /// The live look: run the theme's colorizer.
         case normal
+        /// Uncolored: the raw line, colorizer bypassed (the bust flash's base beat — a loss
+        /// shouldn't celebrate in rainbow between red pulses).
+        case plain
         /// The win flash "off" beat: faint, colorizer bypassed.
         case dim
         /// The bust flash beat: faint red, colorizer bypassed.
         case bust
+    }
+
+    /// The two beats a flash alternates between: `base` on even frames (and the settle
+    /// frame), `pulse` on odd frames. Win = (`.normal`, `.dim`); bust = (`.plain`, `.bust`).
+    struct FlashStyle {
+        let base: GridStyle
+        let pulse: GridStyle
+
+        static let win = FlashStyle(base: .normal, pulse: .dim)
+        static let bust = FlashStyle(base: .plain, pulse: .bust)
     }
 
     private static func drawFrame(
@@ -166,6 +179,7 @@ public enum SlotMachine {
         for line in lines {
             let painted: String = switch style {
             case .normal: colorize(line, phase)
+            case .plain: line
             case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
             case .bust: "\u{1B}[2;31m\(line)\u{1B}[0m"
             }
@@ -174,14 +188,14 @@ public enum SlotMachine {
         return out
     }
 
-    /// Flashes a grid that's already on screen in place — toggling between the live look
-    /// and `offStyle` — then settles on a normal (colorized) frame so no tint lingers under
-    /// whatever the caller prints next. Used for both the win flash (`offStyle: .dim`, all
-    /// `win` faces) and the bust flash (`offStyle: .bust`, the real mixed grid).
+    /// Flashes a grid that's already on screen in place — alternating `style.base` ↔
+    /// `style.pulse` — then settles on the base frame so no pulse tint lingers under
+    /// whatever the caller prints next. Used for both the win flash (`.win`, all `win`
+    /// faces) and the bust flash (`.bust`, the real mixed grid).
     private static func playFlash(
         _ flash: SlotTheme.SlotFinale,
         symbols: [SlotSymbol],
-        offStyle: GridStyle,
+        style: FlashStyle,
         labels: [String],
         theme: SlotTheme,
     ) async {
@@ -192,7 +206,7 @@ public enum SlotMachine {
             colorize: theme.colorize,
             lineCount: lineCount,
             count: flash.frames,
-            offStyle: offStyle,
+            style: style,
         )
         for (index, frame) in frames.enumerated() {
             emit(frame)
@@ -200,21 +214,23 @@ public enum SlotMachine {
         }
     }
 
-    /// The full sequence of flash frames: `count` beats alternating normal ↔ `offStyle`
-    /// (normal on even, off on odd) plus a final normal settle frame, so the grid never
-    /// ends tinted. Every frame moves up by `lineCount` to overwrite the grid already on
-    /// screen. Pure — no I/O.
+    /// The full sequence of flash frames: `count` beats alternating `base` (even) ↔ `pulse`
+    /// (odd), plus a final `base` settle frame so the grid never ends on a pulse. Every
+    /// frame moves up by `lineCount` to overwrite the grid already on screen. The win flash
+    /// uses base `.normal` / pulse `.dim` (colored grid blinks faint); the bust flash uses
+    /// base `.plain` / pulse `.bust` (uncolored grid pulses red — no rainbow on a loss).
+    /// Pure — no I/O.
     static func flashFrames(
         _ lines: [String],
         colorize: SlotColorizer,
         lineCount: Int,
         count: Int,
-        offStyle: GridStyle,
+        style: FlashStyle,
     ) -> [String] {
         (0 ... count).map { frame in
-            let off = frame < count && !frame.isMultiple(of: 2) // last frame settles normal
-            let style: GridStyle = off ? offStyle : .normal
-            return gridFrame(lines, colorize: colorize, phase: frame * finalePhaseStep, moveUp: lineCount, style: style)
+            let isPulse = frame < count && !frame.isMultiple(of: 2) // last frame settles on base
+            let beat = isPulse ? style.pulse : style.base
+            return gridFrame(lines, colorize: colorize, phase: frame * finalePhaseStep, moveUp: lineCount, style: beat)
         }
     }
 

@@ -194,7 +194,7 @@ struct FinaleFramesTests {
     func endsOnABrightSettleFrame() throws {
         // count blink frames + one settle frame; the grid must never be left dimmed.
         let frames = SlotMachine.flashFrames(
-            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 6, offStyle: .dim,
+            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 6, style: .win,
         )
         #expect(frames.count == 7) // count + settle
         #expect(try !#require(frames.last?.contains("\u{1B}[2m"))) // last frame is bright, not faint
@@ -205,7 +205,7 @@ struct FinaleFramesTests {
     func everyFrameRepositionsOntoTheGrid() {
         // Each flash frame overwrites the on-screen grid, so all move up by lineCount.
         let frames = SlotMachine.flashFrames(
-            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, offStyle: .dim,
+            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .win,
         )
         #expect(frames.allSatisfy { $0.contains("\u{1B}[2A") })
     }
@@ -214,10 +214,22 @@ struct FinaleFramesTests {
     func blinkTogglesAcrossFrames() {
         // At least one dim frame exists between bright frames (the actual チカチカ).
         let frames = SlotMachine.flashFrames(
-            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, offStyle: .dim,
+            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .win,
         )
         let dimFrames = frames.filter { $0.contains("\u{1B}[2m") }
         #expect(!dimFrames.isEmpty)
         #expect(dimFrames.count < frames.count) // and bright frames too
+    }
+
+    @Test
+    func bustSequenceNeverShowsTheColorizerAndPulsesRed() throws {
+        // The bug: bust used to alternate normal(rainbow) ↔ red, so a loss still flashed
+        // rainbow. The whole sequence must stay off the colorizer — red ↔ plain, no rainbow.
+        let frames = SlotMachine.flashFrames(
+            grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .bust,
+        )
+        #expect(frames.allSatisfy { !$0.contains("\u{1B}[38;2;") }) // no rainbow truecolor anywhere
+        #expect(frames.contains { $0.contains("\u{1B}[2;31m") }) // some frames pulse red
+        #expect(try !#require(frames.last?.contains("\u{1B}[2;31m"))) // settles plain, not red
     }
 }
