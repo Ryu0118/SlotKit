@@ -110,11 +110,25 @@ public enum SlotMachine {
     }
 
     private static func drawLoop(_ results: ResultBox, labels: [String?], theme: SlotTheme) async {
+        await runDrawLoop(labels: labels, theme: theme) { step in
+            await results.frameState(step: step, theme: theme)
+        }
+    }
+
+    /// The shared draw loop for both the Bool and symbol animation paths: each frame asks
+    /// `frameState` for the reels' current faces (and whether they've all settled), draws
+    /// them, then sleeps `frameInterval`. The two paths differ only in which actor backs
+    /// `frameState`, so the loop itself is single-sourced here. Stops on settle or cancel.
+    static func runDrawLoop(
+        labels: [String?],
+        theme: SlotTheme,
+        frameState: @Sendable (Int) async -> (done: Bool, symbols: [SlotSymbol]),
+    ) async {
         let lineCount = SlotRenderer.lineCount(for: theme, hasLabels: SlotRenderer.hasLabels(labels))
         var step = 0
         var moveUp = 0
         while true {
-            let frame = await results.frameState(step: step, theme: theme)
+            let frame = await frameState(step)
             await drawFrame(frame.symbols, labels: labels, theme: theme, step: step, moveUp: moveUp)
             moveUp = lineCount
             if frame.done || Task.isCancelled { return }
@@ -151,7 +165,7 @@ public enum SlotMachine {
         static let bust = FlashStyle(base: .orange, pulse: .bust)
     }
 
-    private static func drawFrame(
+    static func drawFrame(
         _ symbols: [SlotSymbol],
         labels: [String?],
         theme: SlotTheme,
@@ -193,7 +207,7 @@ public enum SlotMachine {
     /// `style.pulse` — then settles on the base frame so no pulse tint lingers under
     /// whatever the caller prints next. Used for both the win flash (`.win`, all `win`
     /// faces) and the bust flash (`.bust`, the real mixed grid).
-    private static func playFlash(
+    static func playFlash(
         _ flash: SlotTheme.SlotFinale,
         symbols: [SlotSymbol],
         style: FlashStyle,
@@ -235,7 +249,7 @@ public enum SlotMachine {
         }
     }
 
-    private static func emit(_ text: String) {
+    static func emit(_ text: String) {
         FileHandle.standardOutput.write(Data(text.utf8))
     }
 

@@ -26,6 +26,12 @@ public struct SlotTheme: Sendable {
     /// Optional restrained flash played when at least one reel loses — a red sink on the
     /// final grid, deliberately milder than `finale`. `nil` means the grid just settles.
     public let bust: SlotFinale?
+    /// The faces a reel may land on in the symbol-matching mode (``SlotMachine/spinSymbols(_:theme:plain:)``).
+    /// Empty in the win/lose (pass/fail) mode, which lands only on ``win`` / ``lose``.
+    public let symbols: [SlotSymbol]
+    /// The index into ``symbols`` of the top-paying face (the jackpot). `nil` when no symbol
+    /// is singled out as the jackpot, or in win/lose mode. Used only to flag a jackpot win.
+    public let jackpotIndex: Int?
 
     /// A grid flash: the on-screen grid is pulsed in place for `frames` beats — the win
     /// `finale` toggles bright ↔ dim to celebrate a jackpot, the `bust` flash sinks the grid
@@ -56,6 +62,8 @@ public struct SlotTheme: Sendable {
         minSpin: Double,
         finale: SlotFinale?,
         bust: SlotFinale? = nil,
+        symbols: [SlotSymbol] = [],
+        jackpotIndex: Int? = nil,
     ) {
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
@@ -67,6 +75,8 @@ public struct SlotTheme: Sendable {
         self.minSpin = minSpin
         self.finale = finale
         self.bust = bust
+        self.symbols = symbols
+        self.jackpotIndex = jackpotIndex
     }
 
     /// A draft theme passed to ``SlotTheme/make(_:)``; mutate its fields then build.
@@ -91,6 +101,10 @@ public struct SlotTheme: Sendable {
         public var finale: SlotFinale?
         /// Optional restrained loss flash (a red sink). `nil` = no loss animation.
         public var bust: SlotFinale?
+        /// Faces a reel may land on in symbol-matching mode. Empty = win/lose mode only.
+        public var symbols: [SlotSymbol] = []
+        /// Index into ``symbols`` of the jackpot face. `nil` = no jackpot singled out.
+        public var jackpotIndex: Int?
 
         /// An empty draft to fill in from scratch.
         init() {}
@@ -108,6 +122,8 @@ public struct SlotTheme: Sendable {
             minSpin = theme.minSpin
             finale = theme.finale
             bust = theme.bust
+            symbols = theme.symbols
+            jackpotIndex = theme.jackpotIndex
         }
     }
 
@@ -143,6 +159,12 @@ public struct SlotTheme: Sendable {
         for (index, symbol) in draft.spinning.enumerated() {
             try validate(symbol, label: "spinning[\(index)]", width: draft.cellWidth, height: draft.cellHeight)
         }
+        for (index, symbol) in draft.symbols.enumerated() {
+            try validate(symbol, label: "symbols[\(index)]", width: draft.cellWidth, height: draft.cellHeight)
+        }
+        if let jackpotIndex = draft.jackpotIndex, !draft.symbols.indices.contains(jackpotIndex) {
+            throw SlotThemeError.jackpotIndexOutOfRange(index: jackpotIndex, symbolCount: draft.symbols.count)
+        }
         return SlotTheme(
             cellWidth: draft.cellWidth,
             cellHeight: draft.cellHeight,
@@ -154,6 +176,8 @@ public struct SlotTheme: Sendable {
             minSpin: draft.minSpin,
             finale: draft.finale,
             bust: draft.bust,
+            symbols: draft.symbols,
+            jackpotIndex: draft.jackpotIndex,
         )
     }
 
@@ -175,4 +199,6 @@ public enum SlotThemeError: Error, Equatable {
     case wrongRowWidth(symbol: String, row: Int, expected: Int, found: Int)
     /// The theme has no spinning symbols to cycle through.
     case noSpinningSymbols
+    /// `jackpotIndex` does not point at a valid entry in `symbols`.
+    case jackpotIndexOutOfRange(index: Int, symbolCount: Int)
 }
