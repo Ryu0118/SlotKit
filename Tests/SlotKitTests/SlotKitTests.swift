@@ -291,6 +291,18 @@ struct SlotReelsBuilderTests {
         #expect(result.outcomes.map(\.label) == packages)
     }
 
+    @MainActor
+    @Test
+    func builderIsUsableFromMainActor() async {
+        // `@main` CLI entry points and SwiftUI callers are main-actor-isolated; the builder
+        // closure must be `@Sendable` so the block compiles from that context (the other
+        // tests run nonisolated and can't catch this).
+        let result = await SlotMachine.spin(plain: true) {
+            SlotReel(label: "A") { true }
+        }
+        #expect(result.outcomes.map(\.label) == ["A"])
+    }
+
     @Test
     func existingArrayCanBeSplicedIn() async {
         let base = [SlotReel(label: "X") { true }, SlotReel(label: "Y") { true }]

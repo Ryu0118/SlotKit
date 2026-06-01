@@ -55,7 +55,7 @@ public enum SlotMachine {
     public static func spin(
         theme: SlotTheme = .default,
         plain: Bool? = nil,
-        @SlotReelsBuilder _ reels: () -> [SlotReel],
+        @SlotReelsBuilder _ reels: @Sendable () -> [SlotReel],
     ) async -> SlotResult {
         await spin(reels(), theme: theme, plain: plain)
     }

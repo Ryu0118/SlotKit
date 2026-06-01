@@ -82,6 +82,12 @@ plain result line on pipes, CI, or `NO_COLOR`. You can also force it — this is
 how you wire it to a host `--silent` flag 👇
 
 ```swift
+// `spin` also takes a plain `[SlotReel]` array if you'd rather build it yourself.
+let reels: [SlotReel] = [
+    SlotReel(label: "BUILD") { compile() },
+    SlotReel(label: "TEST")  { try await runTests() },
+]
+
 await SlotMachine.spin(reels, plain: isSilent)  // true → no animation, result only
 await SlotMachine.spin(reels, plain: nil)       // nil (default) → auto-detect the terminal
 ```
@@ -115,7 +121,10 @@ let theme = try SlotTheme.make { draft in
     draft.finale        = SlotTheme.SlotFinale(text: " ✦ ALL GREEN ✦ ")  // all-win flourish
 }
 
-await SlotMachine.spin(reels, theme: theme)
+await SlotMachine.spin(theme: theme) {
+    SlotReel(label: "BUILD") { compile() }
+    SlotReel(label: "TEST")  { try await runTests() }
+}
 ```
 
 The knobs:

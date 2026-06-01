@@ -15,15 +15,15 @@ enum Demo {
         let forceFail = arguments.contains("--fail")
         let custom = arguments.contains("--custom")
 
-        let reels = [
-            delayedCheck("YAML", passes: true, milliseconds: 400),
-            delayedCheck("PROP", passes: true, milliseconds: 900),
-            delayedCheck("AUTH", passes: !forceFail, milliseconds: 1500),
-            delayedCheck("DRIFT", passes: true, milliseconds: 2100),
-        ]
         let theme: SlotTheme = custom ? customTheme() : .default
 
-        let result = await SlotMachine.spin(reels, theme: theme)
+        // Declared as a builder block to showcase @SlotReelsBuilder.
+        let result = await SlotMachine.spin(theme: theme) {
+            delayedCheck("BUILD", passes: true, milliseconds: 400)
+            delayedCheck("TEST", passes: true, milliseconds: 900)
+            delayedCheck("LINT", passes: !forceFail, milliseconds: 1500)
+            delayedCheck("DEPLOY", passes: true, milliseconds: 2100)
+        }
 
         for outcome in result.outcomes {
             emitLine("\(outcome.label): \(outcome.passed ? "pass" : "fail")")
