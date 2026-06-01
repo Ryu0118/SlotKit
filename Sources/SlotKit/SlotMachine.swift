@@ -10,6 +10,11 @@ import Foundation
 /// nothing is drawn: the checks still run and a ``SlotResult`` is returned, so callers
 /// can print their own plain lines and output stays deterministic.
 public enum SlotMachine {
+    /// How fast the rainbow gradient scrolls per spin frame (multiplies `step`).
+    private static let phaseStep = 12
+    /// How fast the gradient scrolls per finale frame — faster than `phaseStep` for flash.
+    private static let finalePhaseStep = 36
+
     /// Spins `reels` concurrently and returns each reel's outcome.
     ///
     /// - Parameters:
@@ -40,51 +45,67 @@ public enum SlotMachine {
         return SlotResult(outcomes: outcomes)
     }
 
+    private static func spinReel(_ reel: SlotReel, index: Int, into results: ResultBox, minSpin: Double) async {
+        let passed = await (try? reel.work()) ?? false
+        try? await Task.sleep(for: .seconds(minSpin))
+        await results.finish(index, passed: passed)
+    }
+
     private static func runAnimated(_ reels: [SlotReel], theme: SlotTheme) async -> SlotResult {
         let results = ResultBox(count: reels.count)
-        for (index, reel) in reels.enumerated() {
-            Task { @Sendable in
-                let passed = await (try? reel.work()) ?? false
-                try? await Task.sleep(for: .seconds(theme.minSpin))
-                await results.finish(index, passed: passed)
-            }
-        }
-
         let labels = reels.map(\.label)
-        let lineCount = theme.cellHeight + 3
-        var step = 0
-        var firstDraw = true
-        while await !results.allDone {
-            await drawFrame(results, labels: labels, theme: theme, step: step, moveUp: firstDraw ? 0 : lineCount)
-            firstDraw = false
-            step += 1
-            try? await Task.sleep(for: .seconds(theme.frameInterval))
+
+        // Run the per-reel checks as structured children alongside the draw loop, all
+        // inside one task group so cancellation of the awaiting caller propagates to the
+        // checks (and the draw loop sees `Task.isCancelled` and stops) instead of leaking
+        // detached tasks that busy-spin stdout once their sleeps stop blocking.
+        await withTaskGroup(of: Void.self) { group in
+            for (index, reel) in reels.enumerated() {
+                group.addTask { await spinReel(reel, index: index, into: results, minSpin: theme.minSpin) }
+            }
+            group.addTask {
+                await drawLoop(results, labels: labels, theme: theme)
+            }
+            await group.waitForAll()
         }
-        await drawFrame(results, labels: labels, theme: theme, step: step, moveUp: firstDraw ? 0 : lineCount)
 
         let outcomes = await results.outcomes(labels: labels)
         let result = SlotResult(outcomes: outcomes)
-        if result.allPassed, let finale = theme.finale {
+        if result.allPassed, let finale = theme.finale, !Task.isCancelled {
             await playFinale(finale, colorize: theme.colorize)
         }
         return result
     }
 
+    private static func drawLoop(_ results: ResultBox, labels: [String], theme: SlotTheme) async {
+        let lineCount = SlotRenderer.lineCount(for: theme)
+        var step = 0
+        var moveUp = 0
+        while true {
+            let frame = await results.frameState(step: step, theme: theme)
+            await drawFrame(frame.symbols, labels: labels, theme: theme, step: step, moveUp: moveUp)
+            moveUp = lineCount
+            if frame.done || Task.isCancelled { return }
+            step += 1
+            do {
+                try await Task.sleep(for: .seconds(theme.frameInterval))
+            } catch {
+                return // cancelled mid-sleep — stop rather than spin on instant-returning sleeps
+            }
+        }
+    }
+
     private static func drawFrame(
-        _ results: ResultBox,
+        _ symbols: [SlotSymbol],
         labels: [String],
         theme: SlotTheme,
         step: Int,
         moveUp: Int,
     ) async {
-        var symbols: [SlotSymbol] = []
-        for index in labels.indices {
-            await symbols.append(results.symbol(for: index, step: step, theme: theme))
-        }
         var out = ""
         if moveUp > 0 { out += "\u{1B}[\(moveUp)A" }
         for line in SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme) {
-            out += "\r\(theme.colorize(line, step * 12))\u{1B}[K\n"
+            out += "\r\(theme.colorize(line, step * phaseStep))\u{1B}[K\n"
         }
         emit(out)
     }
@@ -92,15 +113,14 @@ public enum SlotMachine {
     private static func playFinale(_ finale: SlotTheme.SlotFinale, colorize: SlotColorizer) async {
         for frame in 0 ..< finale.frames {
             let blink = frame.isMultiple(of: 2) ? "\u{1B}[5m" : ""
-            emit("\r\(blink)\(colorize(finale.text, frame * 36))\u{1B}[K")
+            emit("\r\(blink)\(colorize(finale.text, frame * finalePhaseStep))\u{1B}[K")
             try? await Task.sleep(for: .seconds(finale.interval))
         }
         emit("\r\u{1B}[K")
     }
 
     private static func emit(_ text: String) {
-        guard let data = text.data(using: .utf8) else { return }
-        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data(text.utf8))
     }
 
     /// Reel state shared between the animation loop and the per-check tasks.
@@ -115,17 +135,21 @@ public enum SlotMachine {
             finished[index] = passed
         }
 
-        var allDone: Bool {
-            finished.allSatisfy { $0 != nil }
-        }
-
         func outcomes(labels: [String]) -> [SlotOutcome] {
             labels.enumerated().map { index, label in
                 SlotOutcome(label: label, passed: finished[index] == true)
             }
         }
 
-        func symbol(for index: Int, step: Int, theme: SlotTheme) -> SlotSymbol {
+        /// Whether every reel has resolved, plus each reel's current face — in one actor
+        /// hop per frame regardless of reel count (resolved reels show win/lose, in-flight
+        /// reels a spinning face cycled by `step`).
+        func frameState(step: Int, theme: SlotTheme) -> (done: Bool, symbols: [SlotSymbol]) {
+            let symbols = finished.indices.map { face(at: $0, step: step, theme: theme) }
+            return (finished.allSatisfy { $0 != nil }, symbols)
+        }
+
+        private func face(at index: Int, step: Int, theme: SlotTheme) -> SlotSymbol {
             if let result = finished[index] {
                 return result ? theme.win : theme.lose
             }

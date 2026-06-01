@@ -100,6 +100,19 @@ struct SlotRendererTests {
         #expect(SlotRenderer.centered("toolong", width: 3) == "too")
         #expect(SlotRenderer.centered("x", width: 5) == "  x  ")
     }
+
+    @Test
+    func lineCountMatchesFrameOutput() throws {
+        // SSoT guard: the count the animation loop uses to reposition the cursor must
+        // equal the lines `frame` actually emits, so layout edits can't silently desync.
+        let theme = try makeTheme()
+        let lines = SlotRenderer.frame(
+            symbols: [SlotSymbol(rows: ["WWW"])],
+            labels: ["A"],
+            theme: theme,
+        )
+        #expect(lines.count == SlotRenderer.lineCount(for: theme))
+    }
 }
 
 struct SlotColorizerTests {
@@ -158,5 +171,38 @@ struct SlotMachineTests {
         let result = await SlotMachine.spin([], plain: true)
         #expect(result.outcomes.isEmpty)
         #expect(result.allPassed) // vacuously true
+    }
+
+    @Test
+    func cancellationPropagatesToReelsOnAnimatedPath() async {
+        // Regression for the busy-spin / leaked-task bug: the animated path (`plain: false`)
+        // must propagate cancellation into the reel checks and return promptly, not spin.
+        let observedCancellation = ObservedFlag()
+        let reels = [
+            SlotReel(label: "SLOW") {
+                do {
+                    try await Task.sleep(for: .seconds(60))
+                } catch {
+                    await observedCancellation.set()
+                    throw error
+                }
+                return true
+            },
+        ]
+
+        let task = Task { await SlotMachine.spin(reels, plain: false) }
+        // Let the spin start, then cancel and confirm it unwinds quickly.
+        try? await Task.sleep(for: .milliseconds(50))
+        task.cancel()
+        _ = await task.value
+
+        #expect(await observedCancellation.value) // cancellation reached the reel's work()
+    }
+
+    private actor ObservedFlag {
+        private(set) var value = false
+        func set() {
+            value = true
+        }
     }
 }
