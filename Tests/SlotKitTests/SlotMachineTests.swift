@@ -167,11 +167,11 @@ struct GridFrameTests {
 
     @Test
     func bustFrameIsRedAndBypassesTheColorizer() {
-        // The bust sink must beat the colorizer's truecolor foreground (`\u{1B}[38;2;…`),
-        // so it bypasses the colorizer and wraps the line in faint red — same trap as dim.
+        // The bust beat must beat the colorizer and be pure red (`#FF0000`), not the
+        // colorizer's scrolling rainbow — so it bypasses the colorizer entirely.
         let bust = SlotMachine.gridFrame(grid, colorize: SlotColorizers.rainbow, phase: 0, moveUp: 3, style: .bust)
-        #expect(bust.contains("\u{1B}[2;31m")) // faint red applied
-        #expect(!bust.contains("\u{1B}[38;2;")) // colorizer's truecolor absent
+        #expect(bust.contains("\u{1B}[1;38;2;255;0;0m")) // bold pure red applied
+        #expect(!bust.contains("\u{1B}[1;38;2;255;59;0m")) // not a rainbow hue (the colorizer's output)
         #expect(bust.contains("AAA")) // grid still drawn
     }
 
@@ -224,12 +224,14 @@ struct FinaleFramesTests {
     @Test
     func bustSequenceNeverShowsTheColorizerAndPulsesRed() throws {
         // The bug: bust used to alternate normal(rainbow) ↔ red, so a loss still flashed
-        // rainbow. The whole sequence must stay off the colorizer — red ↔ plain, no rainbow.
+        // rainbow. The whole sequence must stay off the colorizer — pure red ↔ plain. The
+        // bust red is `255;0;0`; the rainbow's non-red hues (e.g. `255;59;0` at offset 1)
+        // must never appear, which is what distinguishes a bust frame from a rainbow frame.
         let frames = SlotMachine.flashFrames(
             grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4, style: .bust,
         )
-        #expect(frames.allSatisfy { !$0.contains("\u{1B}[38;2;") }) // no rainbow truecolor anywhere
-        #expect(frames.contains { $0.contains("\u{1B}[2;31m") }) // some frames pulse red
-        #expect(try !#require(frames.last?.contains("\u{1B}[2;31m"))) // settles plain, not red
+        #expect(frames.allSatisfy { !$0.contains("\u{1B}[1;38;2;255;59;0m") }) // no rainbow hue anywhere
+        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // some frames pulse pure red
+        #expect(try !#require(frames.last?.contains("\u{1B}[1;38;2;255;0;0m"))) // settles plain, not red
     }
 }

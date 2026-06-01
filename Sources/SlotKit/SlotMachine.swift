@@ -136,7 +136,7 @@ public enum SlotMachine {
         case plain
         /// The win flash "off" beat: faint, colorizer bypassed.
         case dim
-        /// The bust flash beat: faint red, colorizer bypassed.
+        /// The bust flash beat: bold pure-red (truecolor `#FF0000`), colorizer bypassed.
         case bust
     }
 
@@ -163,7 +163,7 @@ public enum SlotMachine {
 
     /// Builds one grid frame string from already-rendered `lines`: an optional cursor-up by
     /// `moveUp` lines, then each line cleared. `.normal` colorizes at `phase`; `.dim` and
-    /// `.bust` emit the line **without** the colorizer wrapped in faint / faint-red SGR.
+    /// `.bust` emit the line **without** the colorizer, wrapped in faint / bold pure-red SGR.
     /// Bypassing the colorizer is required because the built-in colorizers emit bold and
     /// truecolor foregrounds (`\u{1B}[1;38;2;…m`), which would otherwise override the faint
     /// or the red and defeat the flash. Pure — no I/O.
@@ -181,7 +181,7 @@ public enum SlotMachine {
             case .normal: colorize(line, phase)
             case .plain: line
             case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
-            case .bust: "\u{1B}[2;31m\(line)\u{1B}[0m"
+            case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
             }
             out += "\r\(painted)\u{1B}[K\n"
         }
