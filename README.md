@@ -119,7 +119,7 @@ let theme = try SlotTheme.make { draft in
     draft.frameInterval = 0.09                     // seconds per frame (speed)
     draft.minSpin       = 1.0                      // minimum spin time (avoid finishing too fast)
     draft.finale        = SlotTheme.SlotFinale(frames: 8, interval: 0.12)  // all-win grid flash
-    draft.bust          = SlotTheme.SlotFinale(frames: 6, interval: 0.3)   // pure-red loss flash
+    draft.bust          = SlotTheme.SlotFinale(frames: 6, interval: 0.18)  // pure-red loss flash
 }
 
 await SlotMachine.spin(theme: theme) {
