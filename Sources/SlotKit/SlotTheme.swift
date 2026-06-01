@@ -24,18 +24,18 @@ public struct SlotTheme: Sendable {
     /// Optional flourish played when every reel wins (e.g. a jackpot banner).
     public let finale: SlotFinale?
 
-    /// A jackpot-style flourish shown once all reels land on `win`.
+    /// The all-win flourish: once every reel lands on `win`, the winning grid is flashed
+    /// in place for a moment — bright on, dim off — so a jackpot reads as a celebration
+    /// rather than just stopping. Configure how many times it blinks and how fast; a `nil`
+    /// finale on the theme means no flash (the grid just settles).
     public struct SlotFinale: Sendable {
-        /// The text scrolled through the colorizer.
-        public let text: String
-        /// Number of flashing frames.
+        /// Number of blink frames (each toggles the grid bright ↔ dim).
         public let frames: Int
-        /// Seconds between flourish frames.
+        /// Seconds between blink frames.
         public let interval: Double
 
-        /// Creates a finale flourish.
-        public init(text: String, frames: Int = 12, interval: Double = 0.046) {
-            self.text = text
+        /// Creates an all-win blink flourish.
+        public init(frames: Int = 8, interval: Double = 0.12) {
             self.frames = frames
             self.interval = interval
         }

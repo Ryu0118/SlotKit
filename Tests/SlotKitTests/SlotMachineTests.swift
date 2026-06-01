@@ -130,3 +130,78 @@ struct SlotMachineAnimatedTests {
         #expect(result.outcomes.map(\.label) == ["SLOW", "FAST"])
     }
 }
+
+struct GridFrameTests {
+    private let grid = ["AAA", "BBB", "CCC"] // a 3-line grid
+
+    @Test
+    func movesCursorUpByMoveUp() {
+        // The all-win flash redraws the grid that's already on screen above the cursor, so
+        // every flash frame must move up by the grid height to overwrite it in place.
+        let out = SlotMachine.gridFrame(grid, colorize: SlotColorizers.plain, phase: 0, moveUp: 3, dim: false)
+        #expect(out.contains("\u{1B}[3A"))
+    }
+
+    @Test
+    func noMoveUpWhenMoveUpIsZero() {
+        // The very first grid draw (spin start) has nothing above it yet — no cursor-up.
+        let out = SlotMachine.gridFrame(grid, colorize: SlotColorizers.plain, phase: 0, moveUp: 0, dim: false)
+        #expect(!out.hasPrefix("\u{1B}[")) // doesn't open with a reposition escape
+        #expect(!out.contains("\u{1B}[3A"))
+    }
+
+    @Test
+    func dimFrameIsFaintAndBypassesTheBoldColorizer() {
+        // `rainbow` emits bold (`\u{1B}[1;...`). The dim frame must NOT run the colorizer,
+        // because a leading bold would override the faint and defeat the flash — so the
+        // dim frame carries faint and no bold; the bright frame is the reverse.
+        let dim = SlotMachine.gridFrame(grid, colorize: SlotColorizers.rainbow, phase: 0, moveUp: 3, dim: true)
+        #expect(dim.contains("\u{1B}[2m")) // faint applied
+        #expect(!dim.contains("\u{1B}[1;")) // colorizer's bold absent
+        #expect(dim.contains("AAA")) // grid still drawn
+
+        let bright = SlotMachine.gridFrame(grid, colorize: SlotColorizers.rainbow, phase: 0, moveUp: 3, dim: false)
+        #expect(bright.contains("\u{1B}[1;")) // colorized (bold) as usual
+        #expect(!bright.contains("\u{1B}[2m")) // not faint
+    }
+
+    @Test
+    func everyGridLineIsPresentAndClosed() {
+        let out = SlotMachine.gridFrame(grid, colorize: SlotColorizers.plain, phase: 0, moveUp: 3, dim: false)
+        #expect(out.contains("AAA"))
+        #expect(out.contains("BBB"))
+        #expect(out.contains("CCC"))
+        // One newline per line, and each line cleared to end-of-line.
+        #expect(out.count { $0 == "\n" } == grid.count)
+        #expect(out.contains("\u{1B}[K"))
+    }
+}
+
+struct FinaleFramesTests {
+    private let grid = ["AAA", "BBB"]
+
+    @Test
+    func endsOnABrightSettleFrame() throws {
+        // count blink frames + one settle frame; the grid must never be left dimmed.
+        let frames = SlotMachine.finaleFrames(grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 6)
+        #expect(frames.count == 7) // count + settle
+        #expect(try !(#require(frames.last?.contains("\u{1B}[2m")))) // last frame is bright, not faint
+        #expect(try #require(frames.last?.contains("\u{1B}[1;"))) // and colorized
+    }
+
+    @Test
+    func everyFrameRepositionsOntoTheGrid() {
+        // Each flash frame overwrites the on-screen grid, so all move up by lineCount.
+        let frames = SlotMachine.finaleFrames(grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4)
+        #expect(frames.allSatisfy { $0.contains("\u{1B}[2A") })
+    }
+
+    @Test
+    func blinkTogglesAcrossFrames() {
+        // At least one dim frame exists between bright frames (the actual チカチカ).
+        let frames = SlotMachine.finaleFrames(grid, colorize: SlotColorizers.rainbow, lineCount: 2, count: 4)
+        let dimFrames = frames.filter { $0.contains("\u{1B}[2m") }
+        #expect(!dimFrames.isEmpty)
+        #expect(dimFrames.count < frames.count) // and bright frames too
+    }
+}

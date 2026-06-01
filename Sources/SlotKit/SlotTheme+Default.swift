@@ -1,7 +1,7 @@
 public extension SlotTheme {
     /// The built-in arcade theme: chunky 10×5 ASCII faces, a rainbow gradient, a 90 ms
-    /// frame cadence, a 1 s minimum spin, and a flashing `JACKPOT` finale. Reproduces
-    /// the original arcade look.
+    /// frame cadence, a 1 s minimum spin, and an all-win flash (the winning `7` grid
+    /// blinks for a moment). Reproduces the original arcade look.
     ///
     /// Built through the memberwise initializer (not ``make(_:)``) because the art is
     /// known-valid at compile time, so it needs no runtime dimension check.
@@ -14,7 +14,7 @@ public extension SlotTheme {
         colorize: SlotColorizers.rainbow,
         frameInterval: 0.09,
         minSpin: 1.0,
-        finale: SlotFinale(text: "  ★ ★ ★   J A C K P O T   ★ ★ ★  "),
+        finale: SlotFinale(frames: 8, interval: 0.12),
     )
 
     /// The winning face: a chunky `7`.

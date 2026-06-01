@@ -39,9 +39,8 @@ enum Demo {
     }
 
     /// A loud money-slot theme. Every symbol row is exactly 9 single-width columns
-    /// (ASCII + block elements) so it stays grid-aligned — emoji would pass validation
-    /// but render 2 columns wide, so the flashy ones live in the finale instead. The
-    /// dopamine comes from `neonGold`: a custom colorizer (ANSI = zero display width).
+    /// (ASCII + block elements) so it stays grid-aligned. The dopamine comes from
+    /// `neonGold` (a custom colorizer; ANSI = zero display width) plus the all-win flash.
     /// `throws` (not `try?`) so a dimension slip names the offending symbol/row.
     private static func customTheme() throws -> SlotTheme {
         try SlotTheme.make { draft in
@@ -53,11 +52,8 @@ enum Demo {
             draft.win = moneySymbols.win
             draft.lose = moneySymbols.lose
             draft.spinning = moneySymbols.spinning
-            draft.finale = SlotTheme.SlotFinale(
-                text: "💰💰  M E G A   J A C K P O T  💰💰",
-                frames: 28,
-                interval: 0.04,
-            )
+            // All-win flash: blink the winning grid a few times to celebrate the jackpot.
+            draft.finale = SlotTheme.SlotFinale(frames: 10, interval: 0.1)
         }
     }
 

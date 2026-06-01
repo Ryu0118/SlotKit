@@ -15,7 +15,7 @@ enum Fixtures {
             draft.frameInterval = 0.001
             draft.minSpin = 0
             draft.colorize = SlotColorizers.plain
-            draft.finale = SlotTheme.SlotFinale(text: "WIN", frames: 1, interval: 0.001)
+            draft.finale = SlotTheme.SlotFinale(frames: 2, interval: 0.001)
         }
     }
 }

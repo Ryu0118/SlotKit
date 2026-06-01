@@ -96,7 +96,7 @@ public enum SlotMachine {
         let outcomes = await results.outcomes(labels: labels)
         let result = SlotResult(outcomes: outcomes)
         if result.allPassed, let finale = theme.finale, !Task.isCancelled {
-            await playFinale(finale, colorize: theme.colorize)
+            await playFinale(finale, labels: labels, theme: theme)
         }
         return result
     }
@@ -126,21 +126,57 @@ public enum SlotMachine {
         step: Int,
         moveUp: Int,
     ) async {
-        var out = ""
-        if moveUp > 0 { out += "\u{1B}[\(moveUp)A" }
-        for line in SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme) {
-            out += "\r\(theme.colorize(line, step * phaseStep))\u{1B}[K\n"
-        }
-        emit(out)
+        let lines = SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme)
+        emit(gridFrame(lines, colorize: theme.colorize, phase: step * phaseStep, moveUp: moveUp, dim: false))
     }
 
-    private static func playFinale(_ finale: SlotTheme.SlotFinale, colorize: SlotColorizer) async {
-        for frame in 0 ..< finale.frames {
-            let blink = frame.isMultiple(of: 2) ? "\u{1B}[5m" : ""
-            emit("\r\(blink)\(colorize(finale.text, frame * finalePhaseStep))\u{1B}[K")
-            try? await Task.sleep(for: .seconds(finale.interval))
+    /// Builds one grid frame string from already-rendered `lines`: an optional cursor-up by
+    /// `moveUp` lines, then each line cleared. When `dim` is false each line is colorized at
+    /// `phase`; when `dim` is true the line is emitted **without** the colorizer and wrapped
+    /// in faint SGR (`\u{1B}[2m`…`\u{1B}[22m`) — bypassing the colorizer is required because
+    /// the built-in colorizers emit bold (`\u{1B}[1m`), which would otherwise override the
+    /// faint and defeat the flash. Pure — no I/O.
+    static func gridFrame(
+        _ lines: [String],
+        colorize: SlotColorizer,
+        phase: Int,
+        moveUp: Int,
+        dim: Bool,
+    ) -> String {
+        var out = ""
+        if moveUp > 0 { out += "\u{1B}[\(moveUp)A" }
+        for line in lines {
+            let painted = dim ? "\u{1B}[2m\(line)\u{1B}[22m" : colorize(line, phase)
+            out += "\r\(painted)\u{1B}[K\n"
         }
-        emit("\r\u{1B}[K")
+        return out
+    }
+
+    /// Flashes the already-drawn winning grid in place, toggling bright ↔ dim, then settles
+    /// on a bright frame so the grid is left lit with the cursor below it.
+    private static func playFinale(
+        _ finale: SlotTheme.SlotFinale,
+        labels: [String],
+        theme: SlotTheme,
+    ) async {
+        let winGrid = labels.map { _ in theme.win }
+        let lines = SlotRenderer.frame(symbols: winGrid, labels: labels, theme: theme)
+        let lineCount = SlotRenderer.lineCount(for: theme)
+        let frames = finaleFrames(lines, colorize: theme.colorize, lineCount: lineCount, count: finale.frames)
+        for (index, frame) in frames.enumerated() {
+            emit(frame)
+            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(finale.interval)) }
+        }
+    }
+
+    /// The full sequence of all-win flash frames: `count` blink frames (bright on even,
+    /// dim on odd) plus a final bright settle frame, so the grid never ends dimmed. Every
+    /// frame moves up by `lineCount` to overwrite the grid already on screen. Pure — no I/O.
+    static func finaleFrames(_ lines: [String], colorize: SlotColorizer, lineCount: Int, count: Int) -> [String] {
+        (0 ... count).map { frame in
+            let dim = frame < count && !frame.isMultiple(of: 2) // last frame settles bright
+            return gridFrame(lines, colorize: colorize, phase: frame * finalePhaseStep, moveUp: lineCount, dim: dim)
+        }
     }
 
     private static func emit(_ text: String) {
