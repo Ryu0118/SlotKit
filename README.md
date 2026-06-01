@@ -119,6 +119,7 @@ let theme = try SlotTheme.make { draft in
     draft.frameInterval = 0.09                     // seconds per frame (speed)
     draft.minSpin       = 1.0                      // minimum spin time (avoid finishing too fast)
     draft.finale        = SlotTheme.SlotFinale(frames: 8, interval: 0.12)  // all-win grid flash
+    draft.bust          = SlotTheme.SlotFinale(frames: 4, interval: 0.1)   // restrained red loss flash
 }
 
 await SlotMachine.spin(theme: theme) {
@@ -138,6 +139,7 @@ The knobs:
 | `frameInterval` | Spin speed (interval between frames) |
 | `minSpin` | Minimum spin time (so a reel doesn't finish in a dull instant) |
 | `finale` | The all-win flash: blink the winning grid (flash count, interval); `nil` = no flash |
+| `bust` | The loss flash: a restrained red sink on the final grid; `nil` = no loss animation |
 
 > A custom `colorize` receives one laid-out line plus the animation phase.
 > **Don't change the display width** — doing so misaligns the reel grid. Color only.
@@ -164,7 +166,7 @@ let snappy = try SlotTheme.default.with { draft in
 
 ```bash
 swift run slotkit-demo            # 🎰 all win → JACKPOT
-swift run slotkit-demo --fail     # 💥 one reel loses → no jackpot
+swift run slotkit-demo --fail     # 💥 one reel loses → red bust flash, no jackpot
 swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + all-win flash
 swift run slotkit-demo | cat      # 🤐 piped = plain result only
 ```
