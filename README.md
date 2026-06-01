@@ -14,7 +14,7 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 ║   ██     ║║   ██     ║║   ██     ║║   ██     ║
 ║   ██     ║║   ██     ║║   ██     ║║   ██     ║
 ╚══════════╝╚══════════╝╚══════════╝╚══════════╝
-   YAML        PROP        AUTH        DRIFT
+   BUILD        TEST        LINT       DEPLOY   
 
        ★ ★ ★   J A C K P O T   ★ ★ ★
 ```
@@ -54,9 +54,10 @@ import SlotKit
 
 // A check = a reel. Each closure runs concurrently in the background.
 let reels = [
-    SlotReel(label: "YAML")  { validateYAML() },          // sync check
-    SlotReel(label: "AUTH")  { try await checkAuth() },   // network
-    SlotReel(label: "DRIFT") { try await checkDrift() },
+    SlotReel(label: "BUILD")  { compile() },                 // sync check
+    SlotReel(label: "TEST")   { try await runTests() },      // long-running
+    SlotReel(label: "LINT")   { try await lint() },
+    SlotReel(label: "DEPLOY") { try await deploy() },        // network
 ]
 
 // 🎰 Spin! Everything runs in parallel and stops as each check resolves.
