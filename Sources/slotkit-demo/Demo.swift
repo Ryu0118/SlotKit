@@ -10,12 +10,12 @@ import SlotKit
 ///       swift run slotkit-demo --custom   (a custom 2-symbol theme)
 @main
 enum Demo {
-    static func main() async {
+    static func main() async throws {
         let arguments = Set(CommandLine.arguments.dropFirst())
         let forceFail = arguments.contains("--fail")
         let custom = arguments.contains("--custom")
 
-        let theme: SlotTheme = custom ? customTheme() : .default
+        let theme: SlotTheme = try custom ? customTheme() : .default
 
         // Declared as a builder block to showcase @SlotReelsBuilder.
         let result = await SlotMachine.spin(theme: theme) {
@@ -38,22 +38,82 @@ enum Demo {
         }
     }
 
-    private static func customTheme() -> SlotTheme {
-        // A minimal custom theme: 7×3 cells, two spinning faces, a slash vs a dash.
-        guard let theme = try? SlotTheme.make({ draft in
-            draft.cellWidth = 7
-            draft.cellHeight = 3
-            draft.win = SlotSymbol(rows: ["  ╱    ", " ╱     ", "╲╱     "])
-            draft.lose = SlotSymbol(rows: ["       ", "═══════", "       "])
-            draft.spinning = [
-                SlotSymbol(rows: ["  ▄▄▄  ", " █████ ", "  ▀▀▀  "]),
-                SlotSymbol(rows: ["  ◇◇◇  ", " ◇◇◇◇◇ ", "  ◇◇◇  "]),
-            ]
-            draft.finale = SlotTheme.SlotFinale(text: " ✦ ALL GREEN ✦ ")
-        }) else {
-            fatalError("custom demo theme has inconsistent symbol dimensions")
+    /// A loud money-slot theme. Every symbol row is exactly 9 single-width columns
+    /// (ASCII + block elements) so it stays grid-aligned — emoji would pass validation
+    /// but render 2 columns wide, so the flashy ones live in the finale instead. The
+    /// dopamine comes from `neonGold`: a custom colorizer (ANSI = zero display width).
+    /// `throws` (not `try?`) so a dimension slip names the offending symbol/row.
+    private static func customTheme() throws -> SlotTheme {
+        try SlotTheme.make { draft in
+            draft.cellWidth = 9
+            draft.cellHeight = 5
+            draft.colorize = neonGold
+            draft.frameInterval = 0.07
+            draft.minSpin = 1.2
+            draft.win = moneySymbols.win
+            draft.lose = moneySymbols.lose
+            draft.spinning = moneySymbols.spinning
+            draft.finale = SlotTheme.SlotFinale(
+                text: "💰💰  M E G A   J A C K P O T  💰💰",
+                frames: 28,
+                interval: 0.04,
+            )
         }
-        return theme
+    }
+
+    /// The money-slot faces, each row exactly 9 single-width columns.
+    private static let moneySymbols: (win: SlotSymbol, lose: SlotSymbol, spinning: [SlotSymbol]) = (
+        win: SlotSymbol(rows: [
+            " ███████ ",
+            " ▀▀▀▀▀██ ",
+            "    ███  ",
+            "   ███   ",
+            "   ██    ",
+        ]), // a chunky 7
+        lose: SlotSymbol(rows: [
+            "         ",
+            " ███████ ",
+            "         ",
+            " ███████ ",
+            "         ",
+        ]), // a flat double-bar bust
+        spinning: [
+            SlotSymbol(rows: [
+                "   ███   ",
+                "  █ ▄ █  ",
+                "  █ $ █  ",
+                "  █ ▀ █  ",
+                "   ███   ",
+            ]), // dollar
+            SlotSymbol(rows: [
+                "  █████  ",
+                " ██   ██ ",
+                " ██ ¥ ██ ",
+                " ██   ██ ",
+                "  █████  ",
+            ]), // yen
+            SlotSymbol(rows: [
+                "  ▄▄▄▄▄  ",
+                " █ £   █ ",
+                " █  £  █ ",
+                " █   £ █ ",
+                "  ▀▀▀▀▀  ",
+            ]), // pound
+            SlotSymbol(rows: [
+                " ▓▓▓▓▓▓▓ ",
+                " ▓ BAR ▓ ",
+                " ▓▓▓▓▓▓▓ ",
+                " ▓ BAR ▓ ",
+                " ▓▓▓▓▓▓▓ ",
+            ]), // bar
+        ],
+    )
+
+    /// A flashy gold colorizer for the demo: solid truecolor gold, blinking on alternate
+    /// frames. ANSI escapes add no display columns, so the reel grid stays aligned.
+    private static let neonGold: SlotColorizer = { line, phase in
+        let blink = (phase / 12).isMultiple(of: 2) ? "\u{1B}[5m" : ""
+        return "\(blink)\u{1B}[1;38;2;255;215;0m\(line)\u{1B}[0m"
     }
 
     private static func emitLine(_ text: String) {

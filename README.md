@@ -165,7 +165,7 @@ let snappy = try SlotTheme.default.with { draft in
 ```bash
 swift run slotkit-demo            # 🎰 all win → JACKPOT
 swift run slotkit-demo --fail     # 💥 one reel loses → no jackpot
-swift run slotkit-demo --custom   # 🎨 a custom 7×3 theme
+swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + MEGA JACKPOT
 swift run slotkit-demo | cat      # 🤐 piped = plain result only
 ```
 
