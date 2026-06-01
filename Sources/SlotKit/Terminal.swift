@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
 
 /// Detects whether stdout can render an animated, colored slot machine.
 ///
