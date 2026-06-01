@@ -64,7 +64,7 @@ let result = await SlotMachine.spin {
 }
 
 for outcome in result.outcomes {
-    print("\(outcome.label): \(outcome.passed ? "✅" : "❌")")
+    print("\(outcome.label ?? "reel"): \(outcome.passed ? "✅" : "❌")")
 }
 if result.allPassed { print("🎉 All reels passed!") }
 ```
@@ -72,6 +72,10 @@ if result.allPassed { print("🎉 All reels passed!") }
 A `work` closure returning `true` locks the reel on `7` (**win**); `false` or a
 thrown error lands on `X` (**lose**). `spin` returns a `SlotResult` — just read
 `outcomes` (each reel's result) and `allPassed` (did every reel win).
+
+Labels are optional. Drop them — `SlotReel { spin() }` — and when every reel is
+unlabeled the caption row disappears, leaving a plain slot machine (handy for a
+spin-for-its-own-sake CLI rather than a named check runner).
 
 ---
 
@@ -168,6 +172,7 @@ let snappy = try SlotTheme.default.with { draft in
 swift run slotkit-demo            # 🎰 all win → JACKPOT
 swift run slotkit-demo --fail     # 💥 one reel loses → orange↔red bust flash, no jackpot
 swift run slotkit-demo --custom   # 💰 a money-slot theme: gold neon + all-win flash
+swift run slotkit-demo --bare     # 🎰 unlabeled reels — no caption row, just the slot
 swift run slotkit-demo | cat      # 🤐 piped = plain result only
 ```
 
