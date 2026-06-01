@@ -55,19 +55,45 @@ jobs:
         run: .nest/bin/my-swift-linter --config .swift-ast-lint.yml
 
   test:
-    name: Unit Tests (macOS)
+    name: Unit Tests (${{ matrix.name }})
     needs: lint
-    runs-on: macos-26
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-26
+          - name: Linux x86_64
+            runner: ubuntu-latest
+            arch: x86_64
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Select Xcode
+        if: runner.os == 'macOS'
         run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
 
+      - name: Install Swift (setup-swift)
+        if: matrix.arch == 'x86_64'
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.2'
+
       - name: Show Swift version
-        run: xcrun swift --version
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            xcrun swift --version
+          else
+            swift --version
+          fi
 
       - name: Run tests
-        run: xcrun swift test
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            xcrun swift test
+          else
+            swift test
+          fi

@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
 
 /// Detects whether stdout can render an animated, colored slot machine.
 ///
@@ -12,6 +17,9 @@ enum Terminal {
         let environment = ProcessInfo.processInfo.environment
         if environment["NO_COLOR"] != nil { return false }
         if environment["TERM"] == "dumb" { return false }
-        return isatty(fileno(stdout)) != 0
+        // `STDOUT_FILENO` (the constant `1`) instead of `fileno(stdout)`: on Linux the
+        // global `stdout` is a `var`, which Swift 6 rejects as shared mutable state. The
+        // file-descriptor constant sidesteps it and means the same thing on both platforms.
+        return isatty(STDOUT_FILENO) != 0
     }()
 }
