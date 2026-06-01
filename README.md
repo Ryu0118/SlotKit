@@ -38,7 +38,7 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/Ryu0118/SlotKit", from: "0.1.0"),
+.package(url: "https://github.com/Ryu0118/SlotKit", from: "0.2.0"),
 ```
 
 ```swift
@@ -138,7 +138,8 @@ The knobs:
 |------|-----------------|
 | `cellWidth` / `cellHeight` | Reel window size (all symbols must share these dimensions) |
 | `spinning` | The faces that flicker by while a reel spins |
-| `win` / `lose` | The faces a reel locks on when it stops |
+| `win` / `lose` | The faces a reel locks on when it stops (pass/fail `spin`) |
+| `symbols` / `jackpotIndex` | The faces reels land on, and which is the jackpot (symbol `spinSymbols`) |
 | `colorize` | Coloring `(line, phase) -> String`. `.rainbow` / `.plain` / your own |
 | `frameInterval` | Spin speed (interval between frames) |
 | `minSpin` | Minimum spin time (so a reel doesn't finish in a dull instant) |
@@ -163,6 +164,48 @@ let snappy = try SlotTheme.default.with { draft in
     draft.frameInterval = 0.02
 }
 ```
+
+---
+
+## Real slot machine: matching symbols 🍒
+
+The `spin` above is **pass/fail** — every reel lands on `win` or `lose`. For an
+actual slot machine, where each reel stops on one of *several* faces and you win
+by **lining them up**, reach for `spinSymbols`.
+
+Give the theme a set of `symbols` to land on (and which index is the jackpot),
+then return a landed index from each reel:
+
+```swift
+let theme = try SlotTheme.default.with { draft in
+    draft.symbols      = [seven, cherry, bar, bell]   // the faces reels can stop on
+    draft.jackpotIndex = 0                             // index 0 (seven) is the top line
+}
+
+let result = await SlotMachine.spinSymbols(theme: theme) {
+    SymbolReel(label: "1") { draw() }   // each returns an index into `theme.symbols`
+    SymbolReel(label: "2") { draw() }
+    SymbolReel(label: "3") { draw() }
+}
+
+if result.isJackpot {       // every reel on `jackpotIndex` → 777
+    print("🎰 JACKPOT!")
+} else if result.allSame {   // every reel on the same (non-jackpot) symbol → a win line
+    print("🍒 Winner!")
+} else {
+    print("…spin again.")    // mixed line → no win
+}
+```
+
+A `SymbolReel`'s closure returns an `Int` — the index into `theme.symbols` the
+reel lands on. SlotKit only animates the reveal; **you supply the draw**, so the
+odds (how rare a `777` is) live entirely in your code. `spinSymbols` returns a
+`SymbolSpinResult`: read `outcomes` (each reel's `landedIndex`), `allSame` (every
+reel matched), and `isJackpot` (every reel on `jackpotIndex`).
+
+Like `spin`, `spinSymbols` takes a plain `[SymbolReel]` array and a `plain:` flag,
+and stays byte-stable on pipes / CI. The pass/fail `spin` is untouched — both live
+side by side.
 
 ---
 
