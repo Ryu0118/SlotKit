@@ -223,7 +223,7 @@ struct FinaleFramesTests {
 
     @Test
     func bustSequencePulsesRedOnOrangeAndStaysOffTheColorizer() throws {
-        // Bust rests orange (#FF8800) and pulses red (#FF0000), bypassing the colorizer —
+        // Bust rests red-orange (#FF5500) and pulses red (#FF0000), bypassing the colorizer —
         // so the rainbow's non-red hues (e.g. `255;59;0` at offset 1) never appear, which
         // is what distinguishes a bust frame from a rainbow frame. It must start and END
         // orange (the user asked for an orange-settled loss flash).
@@ -232,7 +232,7 @@ struct FinaleFramesTests {
         )
         #expect(frames.allSatisfy { !$0.contains("\u{1B}[1;38;2;255;59;0m") }) // no rainbow hue anywhere
         #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;0;0m") }) // some beats pulse red
-        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;136;0m") }) // some beats rest orange
-        #expect(try #require(frames.last?.contains("\u{1B}[1;38;2;255;136;0m"))) // settles ORANGE
+        #expect(frames.contains { $0.contains("\u{1B}[1;38;2;255;85;0m") }) // some beats rest orange
+        #expect(try #require(frames.last?.contains("\u{1B}[1;38;2;255;85;0m"))) // settles ORANGE
     }
 }

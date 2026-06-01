@@ -135,7 +135,7 @@ public enum SlotMachine {
         case dim
         /// The bust flash pulse: bold pure-red (truecolor `#FF0000`), colorizer bypassed.
         case bust
-        /// The bust flash resting beat: bold orange (`#FF8800`), colorizer bypassed.
+        /// The bust flash resting beat: bold red-orange (`#FF5500`), colorizer bypassed.
         case orange
     }
 
@@ -182,7 +182,7 @@ public enum SlotMachine {
             case .normal: colorize(line, phase)
             case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
             case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
-            case .orange: "\u{1B}[1;38;2;255;136;0m\(line)\u{1B}[0m"
+            case .orange: "\u{1B}[1;38;2;255;85;0m\(line)\u{1B}[0m"
             }
             out += "\r\(painted)\u{1B}[K\n"
         }

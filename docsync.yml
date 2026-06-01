@@ -11,4 +11,4 @@ rules:
   doc: README.md
   message: "Public API surface changed \u2014 update README (Quick start / Customization)
     if types, methods, or theme fields changed."
-  checksum: 1f87600876409edf2cfefe7edb6642144750c7e6823e13f3e556da3441a8ac3a
+  checksum: ff118361da30fc6d78202cf86c196f91d01cdb3361680965e52320f8fd5b8126
