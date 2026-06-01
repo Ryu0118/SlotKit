@@ -7,7 +7,8 @@ rules:
   - Sources/SlotKit/SlotTheme+Default.swift
   - Sources/SlotKit/SlotSymbol.swift
   - Sources/SlotKit/SlotColorizer.swift
+  - Sources/SlotKit/SlotReelsBuilder.swift
   doc: README.md
   message: "Public API surface changed \u2014 update README (Quick start / Customization)
     if types, methods, or theme fields changed."
-  checksum: ae5a0326716b4cb415418dd622861294969763574954a545a08eb23a0c307782
+  checksum: d69f041b656c7b55f13699cf4d7bc0fb137dd16fa89bc1469fed854240798f7f

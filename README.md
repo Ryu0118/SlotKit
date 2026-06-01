@@ -53,15 +53,15 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 import SlotKit
 
 // A check = a reel. Each closure runs concurrently in the background.
-let reels = [
-    SlotReel(label: "BUILD")  { compile() },                 // sync check
-    SlotReel(label: "TEST")   { try await runTests() },      // long-running
-    SlotReel(label: "LINT")   { try await lint() },
-    SlotReel(label: "DEPLOY") { try await deploy() },        // network
-]
-
 // 🎰 Spin! Everything runs in parallel and stops as each check resolves.
-let result = await SlotMachine.spin(reels)
+let result = await SlotMachine.spin {
+    SlotReel(label: "BUILD")  { compile() }                 // sync check
+    SlotReel(label: "TEST")   { try await runTests() }      // long-running
+    SlotReel(label: "LINT")   { try await lint() }
+    if isMainBranch {
+        SlotReel(label: "DEPLOY") { try await deploy() }    // only on main
+    }
+}
 
 for outcome in result.outcomes {
     print("\(outcome.label): \(outcome.passed ? "✅" : "❌")")

@@ -36,6 +36,30 @@ public enum SlotMachine {
         return await runAnimated(reels, theme: theme)
     }
 
+    /// Spins reels declared as a ``SlotReelsBuilder`` block — the same as the array
+    /// overload, but checks can be added conditionally (`if`) or in a loop (`for`).
+    ///
+    /// ```swift
+    /// await SlotMachine.spin {
+    ///     SlotReel(label: "BUILD") { compile() }
+    ///     if isMainBranch { SlotReel(label: "DEPLOY") { try await deploy() } }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - theme: visual + timing configuration (defaults to ``SlotTheme/default``).
+    ///   - plain: force plain (`true`) or animated (`false`) output; `nil` auto-detects.
+    ///   - reels: a builder block producing the checks to run.
+    /// - Returns: the per-reel outcomes; inspect ``SlotResult/allPassed``.
+    @discardableResult
+    public static func spin(
+        theme: SlotTheme = .default,
+        plain: Bool? = nil,
+        @SlotReelsBuilder _ reels: () -> [SlotReel],
+    ) async -> SlotResult {
+        await spin(reels(), theme: theme, plain: plain)
+    }
+
     private static func runPlain(_ reels: [SlotReel]) async -> SlotResult {
         var outcomes: [SlotOutcome] = []
         for reel in reels {
