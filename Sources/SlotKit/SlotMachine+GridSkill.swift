@@ -52,9 +52,7 @@ public extension SlotMachine {
                 group.addTask { await stopColumn(column, index: index, into: results, theme: theme) }
             }
             group.addTask {
-                await runGridDrawLoop(labels: labels, theme: theme) { step in
-                    await results.frameState(step: step, theme: theme)
-                }
+                await runGridDrawLoop(labels: labels, theme: theme, results: results, rows: rows)
             }
             await group.waitForAll()
         }

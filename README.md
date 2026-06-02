@@ -124,6 +124,7 @@ let theme = try SlotTheme.make { draft in
     draft.minSpin       = 1.0                      // minimum spin time (avoid finishing too fast)
     draft.finale        = SlotTheme.SlotFinale(frames: 8, interval: 0.12)  // all-win grid flash
     draft.bust          = SlotTheme.SlotFinale(frames: 6, interval: 0.18)  // orange↔red loss flash
+    draft.scrollSpin    = true                     // grid: reels scroll vertically (real reel feel)
 }
 
 await SlotMachine.spin(theme: theme) {
@@ -145,6 +146,7 @@ The knobs:
 | `minSpin` | Minimum spin time (so a reel doesn't finish in a dull instant) |
 | `finale` | The all-win flash: blink the winning grid (flash count, interval); `nil` = no flash |
 | `bust` | The loss flash: the final grid pulses orange ↔ red; `nil` = no loss animation |
+| `scrollSpin` | Grid path only: in-flight reels scroll their faces vertically (a real reel sliding past the window) instead of swapping the whole face each frame. Default `false` |
 
 > A custom `colorize` receives one laid-out line plus the animation phase.
 > **Don't change the display width** — doing so misaligns the reel grid. Color only.

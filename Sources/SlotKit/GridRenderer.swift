@@ -43,11 +43,11 @@ enum GridRenderer {
         return lines
     }
 
-    private static func artLine(_ rowSymbols: [SlotSymbol], artRow: Int, width: Int) -> String {
-        rowSymbols.map { "║" + SlotRenderer.centered($0.rows[artRow], width: width) + "║" }.joined()
+    static func border(left: String, fill: String, right: String, width: Int, count: Int) -> String {
+        String(repeating: left + String(repeating: fill, count: width) + right, count: count)
     }
 
-    private static func border(left: String, fill: String, right: String, width: Int, count: Int) -> String {
-        String(repeating: left + String(repeating: fill, count: width) + right, count: count)
+    private static func artLine(_ rowSymbols: [SlotSymbol], artRow: Int, width: Int) -> String {
+        rowSymbols.map { "║" + SlotRenderer.centered($0.rows[artRow], width: width) + "║" }.joined()
     }
 }

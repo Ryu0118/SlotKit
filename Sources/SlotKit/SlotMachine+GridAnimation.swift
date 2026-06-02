@@ -6,26 +6,25 @@ import Foundation
 /// funnel into the reusable ``SlotMachine/gridFrame(_:colorize:phase:moveUp:style:)`` and
 /// ``SlotMachine/emit(_:)``, so the shared formatting stays single-sourced.
 extension SlotMachine {
-    /// The grid's draw loop: each frame asks `frameState` for the current `R × C` faces (and
+    /// The grid's draw loop: each frame asks `results` for the current `R × C` faces (and
     /// whether all columns have settled), draws them, then sleeps `frameInterval`. Mirrors
-    /// ``runDrawLoop(labels:theme:frameState:)`` but for a 2D grid.
+    /// ``runDrawLoop(labels:theme:frameState:)`` but for a 2D grid. When ``SlotTheme/scrollSpin``
+    /// is on, in-flight reels scroll their strips (one art row per frame) via
+    /// ``GridRenderer/scrollingFrame(_:theme:)``; otherwise faces swap whole each frame.
     static func runGridDrawLoop(
         labels: [String?],
         theme: SlotTheme,
-        frameState: @Sendable (Int) async -> (done: Bool, grid: [[SlotSymbol]]),
+        results: GridResultBox,
+        rows: Int,
     ) async {
+        let context = GridDrawContext(labels: labels, theme: theme, results: results, rows: rows)
         var step = 0
         var moveUp = 0
+        let lineCount = GridRenderer.lineCount(rows: rows, theme: theme, hasLabels: GridRenderer.hasLabels(labels))
         while true {
-            let frame = await frameState(step)
-            let lineCount = GridRenderer.lineCount(
-                rows: frame.grid.count,
-                theme: theme,
-                hasLabels: GridRenderer.hasLabels(labels),
-            )
-            await drawGridFrame(frame.grid, labels: labels, theme: theme, step: step, moveUp: moveUp)
+            let done = await drawOneGridFrame(context, step: step, moveUp: moveUp)
             moveUp = lineCount
-            if frame.done || Task.isCancelled { return }
+            if done || Task.isCancelled { return }
             step += 1
             do {
                 try await Task.sleep(for: .seconds(theme.frameInterval))
@@ -33,6 +32,15 @@ extension SlotMachine {
                 return
             }
         }
+    }
+
+    /// The loop-invariant inputs of the grid draw loop, bundled so the per-frame draw takes one
+    /// value beside the changing `step` / `moveUp`.
+    struct GridDrawContext {
+        var labels: [String?]
+        var theme: SlotTheme
+        var results: GridResultBox
+        var rows: Int
     }
 
     static func drawGridFrame(
@@ -113,6 +121,27 @@ extension SlotMachine {
         return mask
     }
 
+    /// Draws one grid frame (scroll or frame-swap, per ``SlotTheme/scrollSpin``) and reports
+    /// whether every column has settled. Split out so the loop body stays flat.
+    private static func drawOneGridFrame(_ context: GridDrawContext, step: Int, moveUp: Int) async -> Bool {
+        let theme = context.theme
+        if theme.scrollSpin {
+            let frame = await context.results.scrollState(step: step, theme: theme, labels: context.labels)
+            let lines = GridRenderer.scrollingFrame(frame.input, theme: theme)
+            emit(gridFrame(
+                lines,
+                colorize: theme.colorize,
+                phase: step * gridPhaseStep,
+                moveUp: moveUp,
+                style: .normal,
+            ))
+            return frame.done
+        }
+        let frame = await context.results.frameState(step: step, theme: theme)
+        await drawGridFrame(frame.grid, labels: context.labels, theme: theme, step: step, moveUp: moveUp)
+        return frame.done
+    }
+
     /// The gradient scroll step per grid spin frame (matches the single-row phase step).
     static var gridPhaseStep: Int {
         12
@@ -171,12 +200,17 @@ actor GridResultBox {
     }
 
     /// Stops `column` on the face it is showing at the latest drawn step — the skill-stop. For
-    /// each cell, the spinning face at `lastStep` is mapped back to a ``SlotTheme/symbols``
+    /// each cell, the spinning face showing at `lastStep` is mapped back to a ``SlotTheme/symbols``
     /// index (so a weighted `spinning` pool makes the landed symbol as rare as the pool makes
     /// it). A spinning face not in `symbols` lands as index 0.
+    ///
+    /// The "showing face" must match what the player saw, so it is read through the SAME
+    /// function the renderer draws with: ``SlotRenderer/spinningFace(in:step:index:)`` for the
+    /// frame-swap look, or ``GridRenderer/showingIndex(spinningCount:rowOffset:column:row:geometry:)``
+    /// (the scroll position at `lastStep`, rounded to the aligned face) when scrolling.
     func stopAtCurrentStep(_ column: Int, theme: SlotTheme) {
         let indices = (0 ..< rows).map { row -> Int in
-            let face = SlotRenderer.spinningFace(in: theme.spinning, step: lastStep, index: column * rows + row)
+            let face = showingFace(column: column, row: row, step: lastStep, theme: theme)
             return theme.symbols.firstIndex(of: face) ?? 0
         }
         landed[column] = indices
@@ -195,12 +229,51 @@ actor GridResultBox {
         return (landed.allSatisfy { $0 != nil }, grid)
     }
 
+    /// The scrolling-frame inputs at `step`: the shared spinning pool, each column's landed
+    /// faces (`nil` while in flight), and the scroll offset (`rowOffset == step`, one art row
+    /// per frame). Records `lastStep` like ``frameState(step:theme:)`` so a skill-stop lands on
+    /// the showing face. The draw loop uses this only when ``SlotTheme/scrollSpin`` is on.
+    func scrollState(
+        step: Int,
+        theme: SlotTheme,
+        labels: [String?],
+    ) -> (done: Bool, input: GridRenderer.ScrollInput) {
+        lastStep = step
+        let landedFaces = landed.map { column in
+            column.map { indices in indices.map { SlotMachine.symbol(at: $0, theme: theme) } }
+        }
+        let input = GridRenderer.ScrollInput(
+            spinning: theme.spinning,
+            landedFaces: landedFaces,
+            rowOffset: step,
+            rows: rows,
+            labels: labels,
+        )
+        return (landed.allSatisfy { $0 != nil }, input)
+    }
+
     private func faces(column: Int, step: Int, theme: SlotTheme) -> [SlotSymbol] {
         if let indices = landed[column] {
             return indices.map { SlotMachine.symbol(at: $0, theme: theme) }
         }
-        return (0 ..< rows).map { row in
-            SlotRenderer.spinningFace(in: theme.spinning, step: step, index: column * rows + row)
+        return (0 ..< rows).map { row in showingFace(column: column, row: row, step: step, theme: theme) }
+    }
+
+    /// The aligned face an in-flight cell `(column, row)` shows at `step` — the single source of
+    /// truth shared by the draw loop (via `faces`) and the skill-stop (`stopAtCurrentStep`), so
+    /// a hand stop always lands on the face the player saw. Scrolling reads the strip position
+    /// at `step`; the frame-swap look reads ``SlotRenderer/spinningFace(in:step:index:)``.
+    private func showingFace(column: Int, row: Int, step: Int, theme: SlotTheme) -> SlotSymbol {
+        guard theme.scrollSpin else {
+            return SlotRenderer.spinningFace(in: theme.spinning, step: step, index: column * rows + row)
         }
+        let index = GridRenderer.showingIndex(
+            spinningCount: theme.spinning.count,
+            rowOffset: step,
+            column: column,
+            row: row,
+            geometry: GridRenderer.ScrollGeometry(rows: rows, cellHeight: theme.cellHeight),
+        )
+        return theme.spinning[index]
     }
 }

@@ -32,6 +32,10 @@ public struct SlotTheme: Sendable {
     /// The index into ``symbols`` of the top-paying face (the jackpot). `nil` when no symbol
     /// is singled out as the jackpot, or in win/lose mode. Used only to flag a jackpot win.
     public let jackpotIndex: Int?
+    /// Whether in-flight reels scroll their faces vertically (a real reel sliding past a
+    /// window) instead of swapping the whole face each frame. Grid path only; default `false`
+    /// keeps the original frame-swap look. Landing, layout, and odds are unchanged either way.
+    public let scrollSpin: Bool
 
     /// A grid flash: the on-screen grid is pulsed in place for `frames` beats — the win
     /// `finale` toggles bright ↔ dim to celebrate a jackpot, the `bust` flash sinks the grid
@@ -64,6 +68,7 @@ public struct SlotTheme: Sendable {
         bust: SlotFinale? = nil,
         symbols: [SlotSymbol] = [],
         jackpotIndex: Int? = nil,
+        scrollSpin: Bool = false,
     ) {
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
@@ -77,6 +82,7 @@ public struct SlotTheme: Sendable {
         self.bust = bust
         self.symbols = symbols
         self.jackpotIndex = jackpotIndex
+        self.scrollSpin = scrollSpin
     }
 
     /// A draft theme passed to ``SlotTheme/make(_:)``; mutate its fields then build.
@@ -105,6 +111,8 @@ public struct SlotTheme: Sendable {
         public var symbols: [SlotSymbol] = []
         /// Index into ``symbols`` of the jackpot face. `nil` = no jackpot singled out.
         public var jackpotIndex: Int?
+        /// Whether in-flight reels scroll vertically (grid path). Default `false`.
+        public var scrollSpin = false
 
         /// An empty draft to fill in from scratch.
         init() {}
@@ -124,6 +132,7 @@ public struct SlotTheme: Sendable {
             bust = theme.bust
             symbols = theme.symbols
             jackpotIndex = theme.jackpotIndex
+            scrollSpin = theme.scrollSpin
         }
     }
 
@@ -178,6 +187,7 @@ public struct SlotTheme: Sendable {
             bust: draft.bust,
             symbols: draft.symbols,
             jackpotIndex: draft.jackpotIndex,
+            scrollSpin: draft.scrollSpin,
         )
     }
 
