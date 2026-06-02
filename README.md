@@ -247,6 +247,34 @@ await SlotMachine.spinGrid(rows: 1, paylines: [.row(0)]) {
 
 ---
 
+## Skill stop: land on what's showing 🎯
+
+`spinGrid` lands each column on a symbol you decide up front. For a **skill stop**
+— a real machine where you stop the reel and it lands on whatever's spinning by at
+that instant — use `spinGridSkill`. A `SkillReel` carries only a **stop signal**:
+its `stop` returns when the player (or a timer) chooses, and the column lands on the
+face showing at that frame.
+
+```swift
+let result = await SlotMachine.spinGridSkill(
+    rows: 3,
+    paylines: .allLines(forSquare: 3),
+    theme: theme
+) {
+    SkillReel(label: "①") { await gate.awaitTurn(0) }   // a keypress releases the gate
+    SkillReel(label: "②") { await gate.awaitTurn(1) }
+    SkillReel(label: "③") { await gate.awaitTurn(2) }
+}
+```
+
+The **odds of catching a face live in the theme's `spinning` pool** — make a face
+rare in the pool and it's genuinely hard to stop on, the way a real machine does.
+`spinGridSkill` returns the same `GridSpinResult` as `spinGrid`, so wins, jackpots,
+and highlighting all work the same. (The predetermined-draw `spinGrid` is untouched
+— use it for an auto spin where a fixed interval shouldn't decide the outcome.)
+
+---
+
 ## See it move first 👀
 
 ```bash
