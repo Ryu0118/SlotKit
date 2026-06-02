@@ -157,6 +157,9 @@ extension SlotMachine {
 actor GridResultBox {
     private var landed: [[Int]?]
     private let rows: Int
+    /// The most recent frame `step` the draw loop drew — so a skill-stop can land a column on
+    /// whatever face is showing *right now* without the caller having to know the frame count.
+    private var lastStep = 0
 
     init(columns: Int, rows: Int) {
         landed = Array(repeating: nil, count: columns)
@@ -167,6 +170,18 @@ actor GridResultBox {
         landed[column] = SlotMachine.fit(indices, to: rows)
     }
 
+    /// Stops `column` on the face it is showing at the latest drawn step — the skill-stop. For
+    /// each cell, the spinning face at `lastStep` is mapped back to a ``SlotTheme/symbols``
+    /// index (so a weighted `spinning` pool makes the landed symbol as rare as the pool makes
+    /// it). A spinning face not in `symbols` lands as index 0.
+    func stopAtCurrentStep(_ column: Int, theme: SlotTheme) {
+        let indices = (0 ..< rows).map { row -> Int in
+            let face = SlotRenderer.spinningFace(in: theme.spinning, step: lastStep, index: column * rows + row)
+            return theme.symbols.firstIndex(of: face) ?? 0
+        }
+        landed[column] = indices
+    }
+
     func landedColumns() -> [[Int]] {
         landed.map { $0 ?? Array(repeating: 0, count: rows) }
     }
@@ -174,6 +189,7 @@ actor GridResultBox {
     /// Whether every column has settled, plus the current `R × C` faces — resolved columns
     /// show their landed symbols, in-flight columns spin every cell.
     func frameState(step: Int, theme: SlotTheme) -> (done: Bool, grid: [[SlotSymbol]]) {
+        lastStep = step
         let columnFaces = landed.indices.map { column in faces(column: column, step: step, theme: theme) }
         let grid = (0 ..< rows).map { row in columnFaces.map { $0[row] } }
         return (landed.allSatisfy { $0 != nil }, grid)
