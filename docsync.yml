@@ -13,7 +13,9 @@ rules:
   - Sources/SlotKit/GridSpinResult.swift
   - Sources/SlotKit/GridEvaluation.swift
   - Sources/SlotKit/SlotMachine+Grid.swift
+  - Sources/SlotKit/SkillReel.swift
+  - Sources/SlotKit/SlotMachine+GridSkill.swift
   doc: README.md
   message: "Public API surface changed \u2014 update README (Quick start / Customization)
     if types, methods, or theme fields changed."
-  checksum: b04c4e7dbf536234726c237c6c44c658f4733d2f62469ccb9eeb319a32477cb7
+  checksum: 68bb428005e54af22a85091d7ad275dd78843730d0182f1477412be6a37fda92
