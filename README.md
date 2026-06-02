@@ -209,6 +209,44 @@ side by side.
 
 ---
 
+## A whole grid: rows, columns, and paylines 🎰
+
+`spinSymbols` is one row. For a real machine — an `R × C` grid that pays along
+rows **and** diagonals — reach for `spinGrid`. A `GridReel` is a **column**: it
+stops as a unit, drawing one symbol per row (top to bottom). You declare the
+paylines a win is judged against; `.allLines(forSquare:)` gives you every row
+plus both diagonals of a square grid.
+
+```swift
+let result = await SlotMachine.spinGrid(
+    rows: 3,
+    paylines: .allLines(forSquare: 3),   // 3 rows + 2 diagonals = 5 lines
+    theme: sevenTheme
+) {
+    GridReel(label: "①") { await draw3() }   // each draw → 3 indices, top to bottom
+    GridReel(label: "②") { await draw3() }
+    GridReel(label: "③") { await draw3() }
+}
+
+if result.isJackpot   { print("🎰 JACKPOT on \(result.winningLines.map(\.id))") }
+else if result.didWin { print("🎉 \(result.winningLines.count) line(s)!") }
+```
+
+`spinGrid` returns a `GridSpinResult`: `landed` (the `[row][col]` symbols),
+`winningLines` (the paylines that paid), `didWin`, and `isJackpot`. A win flashes
+the grid; a winning **row** is highlighted on its own. Columns stop left to right,
+so the caller can gate them on keypresses for a real "stop the reel" feel.
+
+A single row is just the `rows: 1` case — same API:
+
+```swift
+await SlotMachine.spinGrid(rows: 1, paylines: [.row(0)]) {
+    for face in drawn { GridReel { [face] } }
+}
+```
+
+---
+
 ## See it move first 👀
 
 ```bash
