@@ -147,6 +147,7 @@ The knobs:
 | `finale` | The all-win flash: blink the winning grid (flash count, interval); `nil` = no flash |
 | `bust` | The loss flash: the final grid pulses orange ↔ red; `nil` = no loss animation |
 | `scrollSpin` | Grid path only: in-flight reels scroll their faces vertically (a real reel sliding past the window) instead of swapping the whole face each frame. Default `false` |
+| `spinningStrips` | Grid path only: one spinning strip per column, so each reel scrolls a different sequence — how a real machine weights a symbol differently on each reel. Column `i` uses `spinningStrips[i % count]`. Empty (default) shares `spinning` across every column |
 
 > A custom `colorize` receives one laid-out line plus the animation phase.
 > **Don't change the display width** — doing so misaligns the reel grid. Color only.

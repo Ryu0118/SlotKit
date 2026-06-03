@@ -36,6 +36,11 @@ public struct SlotTheme: Sendable {
     /// window) instead of swapping the whole face each frame. Grid path only; default `false`
     /// keeps the original frame-swap look. Landing, layout, and odds are unchanged either way.
     public let scrollSpin: Bool
+    /// Per-column spinning strips, for a grid where each reel scrolls a different sequence of
+    /// faces. When non-empty, column `i` scrolls `spinningStrips[i % spinningStrips.count]`
+    /// instead of the shared ``spinning``; this is how a real machine weights a symbol
+    /// differently on each reel. Empty (the default) means every column shares ``spinning``.
+    public let spinningStrips: [[SlotSymbol]]
 
     /// A grid flash: the on-screen grid is pulsed in place for `frames` beats — the win
     /// `finale` toggles bright ↔ dim to celebrate a jackpot, the `bust` flash sinks the grid
@@ -69,6 +74,7 @@ public struct SlotTheme: Sendable {
         symbols: [SlotSymbol] = [],
         jackpotIndex: Int? = nil,
         scrollSpin: Bool = false,
+        spinningStrips: [[SlotSymbol]] = [],
     ) {
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
@@ -83,6 +89,7 @@ public struct SlotTheme: Sendable {
         self.symbols = symbols
         self.jackpotIndex = jackpotIndex
         self.scrollSpin = scrollSpin
+        self.spinningStrips = spinningStrips
     }
 
     /// A draft theme passed to ``SlotTheme/make(_:)``; mutate its fields then build.
@@ -113,6 +120,10 @@ public struct SlotTheme: Sendable {
         public var jackpotIndex: Int?
         /// Whether in-flight reels scroll vertically (grid path). Default `false`.
         public var scrollSpin = false
+        /// Per-column spinning strips (grid path). Leave empty to share ``spinning`` across
+        /// every column; set one strip per column to weight faces differently per reel.
+        /// Element count need not match the column count — columns wrap via modulo.
+        public var spinningStrips: [[SlotSymbol]] = []
 
         /// An empty draft to fill in from scratch.
         init() {}
@@ -133,6 +144,7 @@ public struct SlotTheme: Sendable {
             symbols = theme.symbols
             jackpotIndex = theme.jackpotIndex
             scrollSpin = theme.scrollSpin
+            spinningStrips = theme.spinningStrips
         }
     }
 
@@ -174,6 +186,7 @@ public struct SlotTheme: Sendable {
         if let jackpotIndex = draft.jackpotIndex, !draft.symbols.indices.contains(jackpotIndex) {
             throw SlotThemeError.jackpotIndexOutOfRange(index: jackpotIndex, symbolCount: draft.symbols.count)
         }
+        try validateSpinningStrips(draft)
         return SlotTheme(
             cellWidth: draft.cellWidth,
             cellHeight: draft.cellHeight,
@@ -188,7 +201,21 @@ public struct SlotTheme: Sendable {
             symbols: draft.symbols,
             jackpotIndex: draft.jackpotIndex,
             scrollSpin: draft.scrollSpin,
+            spinningStrips: draft.spinningStrips,
         )
+    }
+
+    /// Validates the per-column strips: every face must fit the cell, and no strip may be empty
+    /// (an empty strip would divide by zero when the renderer wraps the scroll position). An
+    /// empty `spinningStrips` is fine — it means every column shares ``spinning``.
+    private static func validateSpinningStrips(_ draft: Draft) throws {
+        for (column, strip) in draft.spinningStrips.enumerated() {
+            guard !strip.isEmpty else { throw SlotThemeError.emptySpinningStrip(column: column) }
+            for (index, symbol) in strip.enumerated() {
+                let label = "spinningStrips[\(column)][\(index)]"
+                try validate(symbol, label: label, width: draft.cellWidth, height: draft.cellHeight)
+            }
+        }
     }
 
     private static func validate(_ symbol: SlotSymbol, label: String, width: Int, height: Int) throws {
@@ -211,4 +238,16 @@ public enum SlotThemeError: Error, Equatable {
     case noSpinningSymbols
     /// `jackpotIndex` does not point at a valid entry in `symbols`.
     case jackpotIndexOutOfRange(index: Int, symbolCount: Int)
+    /// A per-column spinning strip at `column` is empty (it must list at least one face).
+    case emptySpinningStrip(column: Int)
+}
+
+extension SlotTheme {
+    /// The strip an in-flight column scrolls through: `spinningStrips[column % count]` when
+    /// per-column strips are set, otherwise the shared ``spinning``. The modulo wrap lets a
+    /// short `spinningStrips` cover any column count. Internal — the resolution rule is an
+    /// implementation detail that the renderer and the skill-stop both rely on.
+    func strip(forColumn column: Int) -> [SlotSymbol] {
+        spinningStrips.isEmpty ? spinning : spinningStrips[column % spinningStrips.count]
+    }
 }
