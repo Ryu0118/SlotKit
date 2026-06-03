@@ -25,6 +25,7 @@ public extension SlotMachine {
         paylines: [Payline],
         theme: SlotTheme = .default,
         plain: Bool? = nil,
+        finaleHold: (@Sendable () async -> Void)? = nil,
     ) async -> GridSpinResult {
         let animate = !(plain ?? !Terminal.isInteractive)
         guard animate, !columns.isEmpty, rows > 0 else {
@@ -36,7 +37,13 @@ public extension SlotMachine {
             let grid = (0 ..< rows).map { _ in Array(repeating: 0, count: columns.count) }
             return skillResult(grid: grid, labels: labels, rows: rows, paylines: paylines, theme: theme)
         }
-        return await runAnimatedGridSkill(columns, rows: rows, paylines: paylines, theme: theme)
+        return await runAnimatedGridSkill(
+            columns,
+            rows: rows,
+            paylines: paylines,
+            theme: theme,
+            finaleHold: finaleHold,
+        )
     }
 
     private static func runAnimatedGridSkill(
@@ -44,6 +51,7 @@ public extension SlotMachine {
         rows: Int,
         paylines: [Payline],
         theme: SlotTheme,
+        finaleHold: (@Sendable () async -> Void)?,
     ) async -> GridSpinResult {
         let results = GridResultBox(columns: columns.count, rows: rows)
         let labels = columns.map(\.label)
@@ -59,7 +67,7 @@ public extension SlotMachine {
         let grid = await Self.transpose(results.landedColumns(), rows: rows)
         let result = skillResult(grid: grid, labels: labels, rows: rows, paylines: paylines, theme: theme)
         if !Task.isCancelled {
-            await playGridFinale(result, rows: rows, labels: labels, theme: theme)
+            await playGridFinale(result, rows: rows, labels: labels, theme: theme, hold: finaleHold)
         }
         return result
     }

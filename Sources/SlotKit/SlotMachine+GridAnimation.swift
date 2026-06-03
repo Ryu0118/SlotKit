@@ -57,21 +57,27 @@ extension SlotMachine {
     /// Plays the closing flash for a grid spin. A win flashes the grid (highlighting the
     /// winning rows when any row paid); a loss does the restrained bust sink. Diagonal-only
     /// wins fall back to a whole-grid win flash (row-level SGR can't light a diagonal).
+    ///
+    /// When `hold` is given, a **win keeps flashing** until `hold` returns (e.g. a keypress);
+    /// a loss holds its settled board until then. With `hold` nil the flash is the theme's
+    /// fixed length and the board settles on its own — the original behavior.
     static func playGridFinale(
         _ result: GridSpinResult,
         rows: Int,
         labels: [String?],
         theme: SlotTheme,
+        hold: (@Sendable () async -> Void)? = nil,
     ) async {
         let grid = result.landed.map { row in row.map { symbol(at: $0, theme: theme) } }
         let lines = GridRenderer.frame(grid: grid, labels: labels, theme: theme)
         if result.didWin, let finale = theme.finale {
             let mask = winningRowMask(result, rows: rows, theme: theme, hasLabels: GridRenderer.hasLabels(labels))
             let frames = gridFlashFrames(lines, theme: theme, count: finale.frames, style: .win, highlight: mask)
-            await emitFlash(frames, interval: finale.interval)
+            await playWinFlash(frames, interval: finale.interval, hold: hold)
         } else if !result.didWin, let bust = theme.bust {
             let frames = gridFlashFrames(lines, theme: theme, count: bust.frames, style: .bust, highlight: nil)
             await emitFlash(frames, interval: bust.interval)
+            await hold?()
         }
     }
 
@@ -119,6 +125,34 @@ extension SlotMachine {
             }
         }
         return mask
+    }
+
+    /// Plays the win flash. Without `hold` it runs once (the original fixed-length flourish);
+    /// with `hold` it loops the flash until `hold` returns, so the win blinks until the player
+    /// presses on. The loop is cancelled the instant `hold` resolves.
+    private static func playWinFlash(
+        _ frames: [String],
+        interval: Double,
+        hold: (@Sendable () async -> Void)?,
+    ) async {
+        guard let hold else {
+            await emitFlash(frames, interval: interval)
+            return
+        }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await loopFlash(frames, interval: interval) }
+            group.addTask { await hold() }
+            await group.next() // hold resolves (or the flash task ends); stop the other
+            group.cancelAll()
+        }
+    }
+
+    /// Replays `frames` forever, until the task is cancelled. The win-flash hold races this
+    /// against the hold closure and cancels it when the closure returns.
+    private static func loopFlash(_ frames: [String], interval: Double) async {
+        while !Task.isCancelled {
+            await emitFlash(frames, interval: interval)
+        }
     }
 
     /// Draws one grid frame (scroll or frame-swap, per ``SlotTheme/scrollSpin``) and reports
