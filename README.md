@@ -276,6 +276,10 @@ rare in the pool and it's genuinely hard to stop on, the way a real machine does
 and highlighting all work the same. (The predetermined-draw `spinGrid` is untouched
 — use it for an auto spin where a fixed interval shouldn't decide the outcome.)
 
+Pass a `finaleHold` closure to keep a **win flashing until it returns** (e.g. await
+a keypress) — the blink holds instead of running a fixed length; a loss holds its
+settled board. With no `finaleHold` the finale is the theme's fixed length.
+
 ---
 
 ## See it move first 👀
