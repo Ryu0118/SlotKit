@@ -123,8 +123,10 @@ extension GridRenderer {
             let bandRow = windowRow / theme.cellHeight
             return settled[bandRow].rows[artRow]
         }
+        // The column's own strip, so a per-reel-weighted face scrolls (and lands) here exactly
+        // as the skill-stop's `showingFace` reads it — same resolver, same per-column phase.
         return stripArtRow(
-            input.spinning,
+            theme.strip(forColumn: col),
             at: windowRow + input.rowOffset,
             column: col,
             rows: input.rows,

@@ -261,19 +261,22 @@ actor GridResultBox {
 
     /// The aligned face an in-flight cell `(column, row)` shows at `step` — the single source of
     /// truth shared by the draw loop (via `faces`) and the skill-stop (`stopAtCurrentStep`), so
-    /// a hand stop always lands on the face the player saw. Scrolling reads the strip position
-    /// at `step`; the frame-swap look reads ``SlotRenderer/spinningFace(in:step:index:)``.
+    /// a hand stop always lands on the face the player saw. Reads `column`'s strip
+    /// (``SlotTheme/strip(forColumn:)``) so per-reel weighting lands as it scrolls. Scrolling
+    /// reads the strip position at `step`; the frame-swap look reads
+    /// ``SlotRenderer/spinningFace(in:step:index:)``.
     private func showingFace(column: Int, row: Int, step: Int, theme: SlotTheme) -> SlotSymbol {
+        let strip = theme.strip(forColumn: column)
         guard theme.scrollSpin else {
-            return SlotRenderer.spinningFace(in: theme.spinning, step: step, index: column * rows + row)
+            return SlotRenderer.spinningFace(in: strip, step: step, index: column * rows + row)
         }
         let index = GridRenderer.showingIndex(
-            spinningCount: theme.spinning.count,
+            spinningCount: strip.count,
             rowOffset: step,
             column: column,
             row: row,
             geometry: GridRenderer.ScrollGeometry(rows: rows, cellHeight: theme.cellHeight),
         )
-        return theme.spinning[index]
+        return strip[index]
     }
 }
