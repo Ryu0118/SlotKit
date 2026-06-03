@@ -151,6 +151,18 @@ public enum SlotMachine {
         case bust
         /// The bust flash resting beat: bold red-orange (`#FF5500`), colorizer bypassed.
         case orange
+
+        /// The line wrapped in this style's SGR escape, for the colorizer-bypassed beats —
+        /// the single source of those escape codes. `nil` for ``normal``, whose look comes from
+        /// the theme's colorizer (which the caller supplies), not a fixed escape.
+        func painted(_ line: String) -> String? {
+            switch self {
+            case .normal: nil
+            case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
+            case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
+            case .orange: "\u{1B}[1;38;2;255;85;0m\(line)\u{1B}[0m"
+            }
+        }
     }
 
     /// The two beats a flash alternates between: `base` is the resting state shown on even
@@ -192,12 +204,7 @@ public enum SlotMachine {
         var out = ""
         if moveUp > 0 { out += "\u{1B}[\(moveUp)A" }
         for line in lines {
-            let painted: String = switch style {
-            case .normal: colorize(line, phase)
-            case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
-            case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
-            case .orange: "\u{1B}[1;38;2;255;85;0m\(line)\u{1B}[0m"
-            }
+            let painted = style.painted(line) ?? colorize(line, phase)
             out += "\r\(painted)\u{1B}[K\n"
         }
         return out
@@ -223,10 +230,7 @@ public enum SlotMachine {
             count: flash.frames,
             style: style,
         )
-        for (index, frame) in frames.enumerated() {
-            emit(frame)
-            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(flash.interval)) }
-        }
+        await emitFlash(frames, interval: flash.interval)
     }
 
     /// The full sequence of flash frames: `count` beats alternating `base` (even) ↔ `pulse`

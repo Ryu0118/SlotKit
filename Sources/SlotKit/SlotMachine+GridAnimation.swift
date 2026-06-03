@@ -76,8 +76,7 @@ extension SlotMachine {
             await playWinFlash(frames, interval: finale.interval, hold: hold)
         } else if !result.didWin, let bust = theme.bust {
             let frames = gridFlashFrames(lines, theme: theme, count: bust.frames, style: .bust, highlight: nil)
-            await emitFlash(frames, interval: bust.interval)
-            await hold?()
+            await playLossFlash(frames, interval: bust.interval, hold: hold)
         }
     }
 
@@ -127,6 +126,35 @@ extension SlotMachine {
         return mask
     }
 
+    /// Emits each flash frame in turn, sleeping `interval` *between* frames (not after the last)
+    /// — the single flash-playback loop shared by the grid and single-row finales.
+    static func emitFlash(_ frames: [String], interval: Double) async {
+        for (index, frame) in frames.enumerated() {
+            emit(frame)
+            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(interval)) }
+        }
+    }
+
+    /// Plays the loss flash. Without `hold` it runs once. With `hold`, the bust flash and the
+    /// hold run concurrently — so the advance window is open *during* the flash, with no dead
+    /// gap where a press is dropped — and the call returns only after both the flash finishes
+    /// and the hold resolves.
+    private static func playLossFlash(
+        _ frames: [String],
+        interval: Double,
+        hold: (@Sendable () async -> Void)?,
+    ) async {
+        guard let hold else {
+            await emitFlash(frames, interval: interval)
+            return
+        }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await emitFlash(frames, interval: interval) }
+            group.addTask { await hold() }
+            await group.waitForAll()
+        }
+    }
+
     /// Plays the win flash. Without `hold` it runs once (the original fixed-length flourish);
     /// with `hold` it loops the flash until `hold` returns, so the win blinks until the player
     /// presses on. The loop is cancelled the instant `hold` resolves.
@@ -148,11 +176,23 @@ extension SlotMachine {
     }
 
     /// Replays `frames` forever, until the task is cancelled. The win-flash hold races this
-    /// against the hold closure and cancels it when the closure returns.
+    /// against the hold closure and cancels it when the closure returns. The trailing sleep
+    /// paces the loop even when `frames` is a single frame (`emitFlash` sleeps only *between*
+    /// frames, so a one-frame flash would otherwise spin the CPU and hammer stdout).
     private static func loopFlash(_ frames: [String], interval: Double) async {
         while !Task.isCancelled {
             await emitFlash(frames, interval: interval)
+            do {
+                try await Task.sleep(for: .seconds(interval))
+            } catch {
+                return
+            }
         }
+    }
+
+    /// The gradient scroll step per grid spin frame (matches the single-row phase step).
+    static var gridPhaseStep: Int {
+        12
     }
 
     /// Draws one grid frame (scroll or frame-swap, per ``SlotTheme/scrollSpin``) and reports
@@ -176,18 +216,6 @@ extension SlotMachine {
         return frame.done
     }
 
-    /// The gradient scroll step per grid spin frame (matches the single-row phase step).
-    static var gridPhaseStep: Int {
-        12
-    }
-
-    private static func emitFlash(_ frames: [String], interval: Double) async {
-        for (index, frame) in frames.enumerated() {
-            emit(frame)
-            if index < frames.count - 1 { try? await Task.sleep(for: .seconds(interval)) }
-        }
-    }
-
     private static func maskedFrame(
         _ lines: [String],
         highlight: [Bool],
@@ -206,111 +234,7 @@ extension SlotMachine {
     }
 
     private static func paint(_ line: String, style: GridStyle) -> String {
-        switch style {
-        case .normal: SlotColorizers.plain(line, 0)
-        case .dim: "\u{1B}[2m\(line)\u{1B}[22m"
-        case .bust: "\u{1B}[1;38;2;255;0;0m\(line)\u{1B}[0m"
-        case .orange: "\u{1B}[1;38;2;255;85;0m\(line)\u{1B}[0m"
-        }
-    }
-}
-
-/// Per-column reel state for the grid path: a column reveals all its cells at once when its
-/// draw resolves. Mirrors ``SlotMachine``'s single-row result actors, keyed per column.
-actor GridResultBox {
-    private var landed: [[Int]?]
-    private let rows: Int
-    /// The most recent frame `step` the draw loop drew — so a skill-stop can land a column on
-    /// whatever face is showing *right now* without the caller having to know the frame count.
-    private var lastStep = 0
-
-    init(columns: Int, rows: Int) {
-        landed = Array(repeating: nil, count: columns)
-        self.rows = rows
-    }
-
-    func reveal(_ column: Int, indices: [Int]) {
-        landed[column] = SlotMachine.fit(indices, to: rows)
-    }
-
-    /// Stops `column` on the face it is showing at the latest drawn step — the skill-stop. For
-    /// each cell, the spinning face showing at `lastStep` is mapped back to a ``SlotTheme/symbols``
-    /// index (so a weighted `spinning` pool makes the landed symbol as rare as the pool makes
-    /// it). A spinning face not in `symbols` lands as index 0.
-    ///
-    /// The "showing face" must match what the player saw, so it is read through the SAME
-    /// function the renderer draws with: ``SlotRenderer/spinningFace(in:step:index:)`` for the
-    /// frame-swap look, or ``GridRenderer/showingIndex(spinningCount:rowOffset:column:row:geometry:)``
-    /// (the scroll position at `lastStep`, rounded to the aligned face) when scrolling.
-    func stopAtCurrentStep(_ column: Int, theme: SlotTheme) {
-        let indices = (0 ..< rows).map { row -> Int in
-            let face = showingFace(column: column, row: row, step: lastStep, theme: theme)
-            return theme.symbols.firstIndex(of: face) ?? 0
-        }
-        landed[column] = indices
-    }
-
-    func landedColumns() -> [[Int]] {
-        landed.map { $0 ?? Array(repeating: 0, count: rows) }
-    }
-
-    /// Whether every column has settled, plus the current `R × C` faces — resolved columns
-    /// show their landed symbols, in-flight columns spin every cell.
-    func frameState(step: Int, theme: SlotTheme) -> (done: Bool, grid: [[SlotSymbol]]) {
-        lastStep = step
-        let columnFaces = landed.indices.map { column in faces(column: column, step: step, theme: theme) }
-        let grid = (0 ..< rows).map { row in columnFaces.map { $0[row] } }
-        return (landed.allSatisfy { $0 != nil }, grid)
-    }
-
-    /// The scrolling-frame inputs at `step`: the shared spinning pool, each column's landed
-    /// faces (`nil` while in flight), and the scroll offset (`rowOffset == step`, one art row
-    /// per frame). Records `lastStep` like ``frameState(step:theme:)`` so a skill-stop lands on
-    /// the showing face. The draw loop uses this only when ``SlotTheme/scrollSpin`` is on.
-    func scrollState(
-        step: Int,
-        theme: SlotTheme,
-        labels: [String?],
-    ) -> (done: Bool, input: GridRenderer.ScrollInput) {
-        lastStep = step
-        let landedFaces = landed.map { column in
-            column.map { indices in indices.map { SlotMachine.symbol(at: $0, theme: theme) } }
-        }
-        let input = GridRenderer.ScrollInput(
-            spinning: theme.spinning,
-            landedFaces: landedFaces,
-            rowOffset: step,
-            rows: rows,
-            labels: labels,
-        )
-        return (landed.allSatisfy { $0 != nil }, input)
-    }
-
-    private func faces(column: Int, step: Int, theme: SlotTheme) -> [SlotSymbol] {
-        if let indices = landed[column] {
-            return indices.map { SlotMachine.symbol(at: $0, theme: theme) }
-        }
-        return (0 ..< rows).map { row in showingFace(column: column, row: row, step: step, theme: theme) }
-    }
-
-    /// The aligned face an in-flight cell `(column, row)` shows at `step` — the single source of
-    /// truth shared by the draw loop (via `faces`) and the skill-stop (`stopAtCurrentStep`), so
-    /// a hand stop always lands on the face the player saw. Reads `column`'s strip
-    /// (``SlotTheme/strip(forColumn:)``) so per-reel weighting lands as it scrolls. Scrolling
-    /// reads the strip position at `step`; the frame-swap look reads
-    /// ``SlotRenderer/spinningFace(in:step:index:)``.
-    private func showingFace(column: Int, row: Int, step: Int, theme: SlotTheme) -> SlotSymbol {
-        let strip = theme.strip(forColumn: column)
-        guard theme.scrollSpin else {
-            return SlotRenderer.spinningFace(in: strip, step: step, index: column * rows + row)
-        }
-        let index = GridRenderer.showingIndex(
-            spinningCount: strip.count,
-            rowOffset: step,
-            column: column,
-            row: row,
-            geometry: GridRenderer.ScrollGeometry(rows: rows, cellHeight: theme.cellHeight),
-        )
-        return strip[index]
+        // `.normal` here means "no flash" — the static masked frame shows the plain board.
+        style.painted(line) ?? SlotColorizers.plain(line, 0)
     }
 }
