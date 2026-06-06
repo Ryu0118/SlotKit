@@ -2,6 +2,9 @@
 import Testing
 
 struct SlotBoardTests {
+    /// A plain-colorizer theme: `frame`'s color step is the identity, so these layout/highlight
+    /// assertions stay ANSI-free except for the reverse-video this code adds. Color application is
+    /// covered separately in ``colorizerIsAppliedToTheBoard``.
     private func makeTheme() throws -> SlotTheme {
         try SlotTheme.make { draft in
             draft.cellWidth = 3
@@ -9,6 +12,7 @@ struct SlotBoardTests {
             draft.win = SlotSymbol(rows: ["WWW"])
             draft.lose = SlotSymbol(rows: ["LLL"])
             draft.spinning = [SlotSymbol(rows: ["..."])]
+            draft.colorize = SlotColorizers.plain
         }
     }
 
@@ -16,13 +20,46 @@ struct SlotBoardTests {
     private let reverseOff = "\u{1B}[0m"
 
     @Test
-    func nilHighlightIsIdenticalToSlotRenderer() throws {
-        let theme = try makeTheme()
+    func nilHighlightWithPlainThemeIsIdenticalToSlotRenderer() throws {
+        let theme = try makeTheme() // plain colorizer
         let symbols = [SlotSymbol(rows: ["WWW"]), SlotSymbol(rows: ["LLL"])]
         let labels: [String?] = ["A", "B"]
         let board = SlotBoard.frame(symbols: symbols, labels: labels, theme: theme, highlight: nil)
         let plain = SlotRenderer.frame(symbols: symbols, labels: labels, theme: theme)
         #expect(board == plain)
+    }
+
+    @Test
+    func colorizerIsAppliedToTheBoard() throws {
+        // A rainbow theme must emit truecolor SGR; the layout glyphs are still all present.
+        let theme = try SlotTheme.make { draft in
+            draft.cellWidth = 3
+            draft.cellHeight = 1
+            draft.win = SlotSymbol(rows: ["WWW"])
+            draft.lose = SlotSymbol(rows: ["LLL"])
+            draft.spinning = [SlotSymbol(rows: ["..."])]
+            draft.colorize = SlotColorizers.rainbow
+        }
+        let symbols = [SlotSymbol(rows: ["WWW"])]
+        let lines = SlotBoard.frame(symbols: symbols, labels: ["A"], theme: theme, highlight: nil, phase: 0)
+        #expect(lines.contains { $0.contains("\u{1B}[") }) // some ANSI color was emitted
+        #expect(lines.contains { $0.contains("W") }) // the face survives coloring
+    }
+
+    @Test
+    func phaseShiftsTheColors() throws {
+        let theme = try SlotTheme.make { draft in
+            draft.cellWidth = 3
+            draft.cellHeight = 1
+            draft.win = SlotSymbol(rows: ["WWW"])
+            draft.lose = SlotSymbol(rows: ["LLL"])
+            draft.spinning = [SlotSymbol(rows: ["..."])]
+            draft.colorize = SlotColorizers.rainbow
+        }
+        let symbols = [SlotSymbol(rows: ["WWW"])]
+        let atZero = SlotBoard.frame(symbols: symbols, labels: ["A"], theme: theme, phase: 0)
+        let atShifted = SlotBoard.frame(symbols: symbols, labels: ["A"], theme: theme, phase: 120)
+        #expect(atZero != atShifted) // the gradient scrolled with phase
     }
 
     @Test
