@@ -282,6 +282,43 @@ settled board. With no `finaleHold` the finale is the theme's fixed length.
 
 ---
 
+## Drive your own board: `SlotBoard` 🕹️
+
+`SlotMachine.spin` owns the terminal — it animates the reels and reads no input.
+When you want to drive the board yourself (your own loop, your own keys — say an
+interactive picker you arrow across), reach for **`SlotBoard`**. It hands you the
+*drawing* and leaves the loop to you: give it the faces, get back the lines to print.
+
+```swift
+let lines = SlotBoard.frame(
+    symbols: [theme.win, theme.lose, theme.win],   // the face on each reel
+    labels: ["Build", "Lint", "Test"],             // a nil cell renders blank
+    theme: theme,                                  // geometry + colorizer
+    highlight: 0,                                  // reverse-video this cell (nil = none)
+    phase: step * 12                               // scrolls the colorizer's gradient
+)
+print(lines.joined(separator: "\n"))
+```
+
+`frame` returns the board as `[String]` — box art, faces, labels, the theme's color,
+and (when `highlight` is non-nil) the selected cell wrapped in reverse video. It
+writes nothing itself, so you decide when and how to paint. Layout is delegated to
+the pure `SlotRenderer`; color and the highlight are layered on top, the same split
+`SlotMachine` uses internally.
+
+For a reel you're animating yourself, `SlotBoard.spinningFace(in:step:index:)` picks
+the face a spinning reel shows at a given frame — the same cycling the built-in
+animation would show, so a hand-rolled spin matches:
+
+```swift
+let face = SlotBoard.spinningFace(in: theme.spinning, step: step, index: reelIndex)
+```
+
+[slotchecker](https://github.com/Ryu0118/slotchecker) is built on exactly this: it
+keeps its own key loop and log viewer, and lets `SlotBoard` draw every frame.
+
+---
+
 ## See it move first 👀
 
 ```bash
