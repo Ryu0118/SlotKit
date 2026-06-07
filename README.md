@@ -36,6 +36,8 @@ resolves it **slams to a stop** on `7` (pass) or `X` (fail). Line up all `7`s an
 
 ## Install
 
+Works on **macOS and Linux** (Swift 6.2+); the test suite runs on both in CI.
+
 ```swift
 // Package.swift
 .package(url: "https://github.com/Ryu0118/SlotKit", from: "0.2.0"),
