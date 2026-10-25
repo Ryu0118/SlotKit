@@ -52,6 +52,9 @@ The toolchain is pinned via `nestfile.yaml` and resolved into `.nest/bin/` by
   (`missing_docs`). Internal helpers stay non-public.
 - No file-scope `func` in library code (`no-top-level-function`) — use a type/extension
   or a namespace `enum`. (The demo's `main.swift` is exempt by nature.)
+- When documentation and the existing code disagree, follow the conventions used in the
+  existing code, and in your final reply list every inconsistency you found between the
+  documentation and the code.
 
 ## Design Rules
 
